@@ -16,8 +16,17 @@
     root.MATCHES = data.MATCHES;
     root.JOKES = data.JOKES;
     root.scoreMatch = data.scoreMatch;
+    root.DEADLINE = data.DEADLINE;
   }
 })(typeof self !== "undefined" ? self : this, function () {
+
+  /* ---------- Cierre de la quiniela ----------
+     Se puede EDITAR la quiniela hasta esta fecha/hora. Después se bloquea.
+     El Mundial 2026 arranca el 11 de junio de 2026, así que dejamos editar
+     hasta el día antes (se cierra el 11 a las 00:00, hora de Venezuela, UTC-4).
+     👉 Cambia esta fecha si quieres otro cierre. Formato ISO con zona horaria.
+     (En el servidor también puedes sobrescribirla con la variable QUINIELA_DEADLINE.) */
+  const DEADLINE = "2026-06-11T00:00:00-04:00";
 
   const TEAMS = {
     ARG: { name: "Argentina",      flag: "🇦🇷" },
@@ -101,5 +110,5 @@
     return 0;
   }
 
-  return { TEAMS, MATCHES, JOKES, scoreMatch };
+  return { TEAMS, MATCHES, JOKES, scoreMatch, DEADLINE };
 });

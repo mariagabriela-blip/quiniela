@@ -166,9 +166,50 @@ function renderCurrentPlayer() {
 }
 
 /* ============================================================
+   CIERRE DE LA QUINIELA (cuenta regresiva)
+   ============================================================ */
+function deadlineMs() {
+  // El estado manda; si aún no cargó, usa la constante compartida
+  const iso = (lastState && lastState.deadline) || (typeof DEADLINE !== "undefined" ? DEADLINE : null);
+  const ms = iso ? Date.parse(iso) : NaN;
+  return Number.isFinite(ms) ? ms : null;
+}
+function isLocked() {
+  if (lastState && typeof lastState.locked === "boolean" && lastState.locked) return true;
+  const dl = deadlineMs();
+  return dl != null && Date.now() >= dl;
+}
+function countdownText() {
+  const dl = deadlineMs();
+  if (dl == null) return "";
+  let s = Math.max(0, Math.floor((dl - Date.now()) / 1000));
+  const d = Math.floor(s / 86400); s -= d * 86400;
+  const h = Math.floor(s / 3600); s -= h * 3600;
+  const m = Math.floor(s / 60); s -= m * 60;
+  return `${d}d ${h}h ${m}m ${s}s`;
+}
+function renderDeadlineBanner() {
+  const el = $("#deadlineBanner");
+  if (!el) return;
+  const dl = deadlineMs();
+  if (dl == null) { el.className = "deadline"; el.innerHTML = ""; return; }
+  const fecha = new Date(dl).toLocaleString("es-VE", {
+    day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+  if (isLocked()) {
+    el.className = "deadline locked";
+    el.innerHTML = `🔒 <b>La quiniela está cerrada.</b> Cerró el ${fecha}. ¡Que ruede el balón! ⚽`;
+  } else {
+    el.className = "deadline open";
+    el.innerHTML = `⏰ Puedes editar tu quiniela hasta el <b>${fecha}</b> · cierra en <b>${countdownText()}</b>`;
+  }
+}
+
+/* ============================================================
    MI QUINIELA
    ============================================================ */
 function renderQuiniela() {
+  renderDeadlineBanner();
   const need = $("#needRegister");
   const list = $("#matchesList");
   const saveBtn = $("#saveQuiniela");
@@ -177,17 +218,20 @@ function renderQuiniela() {
     need.classList.remove("hidden"); list.innerHTML = ""; saveBtn.classList.add("hidden");
     return;
   }
-  need.classList.add("hidden"); saveBtn.classList.remove("hidden");
+  need.classList.add("hidden");
+  const locked = isLocked();
+  saveBtn.classList.toggle("hidden", locked);
   const preds = rec.predictions || {};
+  const dis = locked ? "disabled" : "";
   list.innerHTML = MATCHES.map((m) => {
     const p = preds[m.id] || {};
     return `<div class="match">
       <div class="grp">Grupo ${m.group}</div>
       ${teamHTML(m.home)}
       <div class="vs">
-        <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="h" value="${p.h ?? ""}" />
+        <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="h" value="${p.h ?? ""}" ${dis} />
         <span class="x">vs</span>
-        <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="a" value="${p.a ?? ""}" />
+        <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="a" value="${p.a ?? ""}" ${dis} />
       </div>
       ${teamHTML(m.away)}
     </div>`;
@@ -196,6 +240,7 @@ function renderQuiniela() {
 
 $("#saveQuiniela").addEventListener("click", async () => {
   if (!me) return;
+  if (isLocked()) { renderQuiniela(); return toast("⏰ La quiniela ya cerró. ¡A ver los partidos!"); }
   const predictions = {};
   $$("#matchesList .score-in").forEach((inp) => {
     const mid = inp.dataset.mid, side = inp.dataset.side;
@@ -390,4 +435,6 @@ tick();
   const rec = myRecord();
   if (rec && rec.fav) $("#favTeam").value = rec.fav;
   setInterval(() => { if (activeTab === "tabla") refreshState(); }, 8000);
+  // Cuenta regresiva en vivo (cada segundo) mientras ves tu quiniela
+  setInterval(() => { if (activeTab === "quiniela") renderDeadlineBanner(); }, 1000);
 })();

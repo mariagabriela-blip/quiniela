@@ -121,6 +121,11 @@ input[type=file] { font-size: .9rem; padding: 8px 0; }
   font-weight: 700; margin-bottom: 14px;
 }
 
+.deadline { border-radius: 12px; padding: 12px 14px; font-weight: 700; margin-bottom: 14px; text-align: center; }
+.deadline:empty { display: none; }
+.deadline.open   { background: #e6f4ea; color: var(--green-dark); border: 1px solid #b8e0c4; }
+.deadline.locked { background: #ffe0e0; color: var(--red); border: 1px solid #ffc2c2; }
+
 /* ============ Matches ============ */
 .matches { display: flex; flex-direction: column; gap: 12px; }
 .match {

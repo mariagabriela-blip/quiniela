@@ -9,10 +9,14 @@ const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
 
-const { MATCHES, scoreMatch } = require("../public/shared-data.js");
+const { MATCHES, scoreMatch, DEADLINE } = require("../public/shared-data.js");
 const store = require("./store.js");
 
 const ADMIN_PIN = process.env.ADMIN_PIN || "1234";
+// Cierre de la quiniela: variable de entorno o el valor de shared-data.js
+const DEADLINE_ISO = process.env.QUINIELA_DEADLINE || DEADLINE;
+const DEADLINE_MS = Date.parse(DEADLINE_ISO);
+const isLocked = () => Number.isFinite(DEADLINE_MS) && Date.now() >= DEADLINE_MS;
 const SALT = process.env.PIN_SALT || "quiniela-mundial-sal-2026";
 const MAX_RECEIPT_CHARS = 5_000_000; // ~3.7 MB de imagen
 
@@ -79,7 +83,10 @@ app.get("/api/state", async (_req, res, next) => {
       };
     });
     out.sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
-    res.json({ players: out, results, totalMatches: MATCHES.length });
+    res.json({
+      players: out, results, totalMatches: MATCHES.length,
+      deadline: DEADLINE_ISO, locked: isLocked(),
+    });
   } catch (e) { next(e); }
 });
 
@@ -121,6 +128,8 @@ app.post("/api/predictions", async (req, res, next) => {
   try {
     const name = (req.body.name || "").trim();
     const pin = (req.body.pin || "").trim();
+    if (isLocked())
+      return res.status(403).json({ error: "⏰ La quiniela ya cerró. ¡Que empiece el Mundial!" });
     const player = await store.getPlayer(name);
     if (!player) return res.status(404).json({ error: "Regístrate primero" });
     if (player.pin_hash !== hashPin(pin))
