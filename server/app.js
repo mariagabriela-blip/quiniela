@@ -2,25 +2,23 @@
    La Quiniela del Mundial — App Express (sin .listen()).
    La usan tanto el servidor local (server.js) como Vercel (api/index.js).
    Datos vía store.js (SQLite local o Postgres en la nube).
-   Identidad: nombre + PIN personal de cada jugador.
-   Comprobante de pago: imagen en base64 guardada en la base.
+   - Identidad: nombre + PIN personal de cada jugador.
+   - Comprobante de pago: imagen en base64 guardada en la base.
+   - Partidos en la base: el admin puede agregar rondas (eliminatorias).
+   - Cierre POR PARTIDO: cada partido se bloquea en su propia fecha.
    ============================================================ */
 const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
 
-const { MATCHES, scoreMatch, DEADLINE } = require("../public/shared-data.js");
+const { TEAMS, scoreMatch, DEADLINE } = require("../public/shared-data.js");
 const store = require("./store.js");
 
 const ADMIN_PIN = process.env.ADMIN_PIN || "1234";
-// Cierre de la quiniela: variable de entorno o el valor de shared-data.js
-const DEADLINE_ISO = process.env.QUINIELA_DEADLINE || DEADLINE;
-const DEADLINE_MS = Date.parse(DEADLINE_ISO);
-const isLocked = () => Number.isFinite(DEADLINE_MS) && Date.now() >= DEADLINE_MS;
+const DEADLINE_ISO = process.env.QUINIELA_DEADLINE || DEADLINE; // cierre por defecto (grupos)
 const SALT = process.env.PIN_SALT || "quiniela-mundial-sal-2026";
 const MAX_RECEIPT_CHARS = 5_000_000; // ~3.7 MB de imagen
 
-const VALID_MATCH = new Set(MATCHES.map((m) => m.id));
 const hashPin = (pin) => crypto.createHash("sha256").update(SALT + ":" + pin).digest("hex");
 const clampScore = (v) => {
   let n = parseInt(v, 10);
@@ -28,15 +26,12 @@ const clampScore = (v) => {
   if (n > 30) n = 30;
   return n;
 };
-function toEntries(obj) {
-  const out = [];
-  for (const [mid, val] of Object.entries(obj || {})) {
-    if (!VALID_MATCH.has(mid) || !val) continue;
-    if (val.h === "" || val.h == null || val.a === "" || val.a == null) continue;
-    out.push({ match_id: mid, h: clampScore(val.h), a: clampScore(val.a) });
-  }
-  return out;
+const matchDeadline = (m) => (m && m.deadline) || DEADLINE_ISO;
+function matchLocked(m) {
+  const ms = Date.parse(matchDeadline(m));
+  return Number.isFinite(ms) && Date.now() >= ms;
 }
+const hasBoth = (v) => v && v.h !== "" && v.h != null && v.a !== "" && v.a != null;
 
 const app = express();
 app.use(express.json({ limit: "8mb" }));
@@ -46,16 +41,11 @@ app.use(express.static(path.join(__dirname, "..", "public")));
 
 // Diagnóstico: dice si la base de datos está conectada. Funciona aunque falle.
 app.get("/api/health", async (_req, res) => {
-  try {
-    await store.ready;
-    res.json({ ok: true, db: store.kind, deadline: DEADLINE_ISO, locked: isLocked() });
-  } catch (e) {
-    res.status(503).json({ ok: false, db: store.kind, error: e.message });
-  }
+  try { await store.ready; res.json({ ok: true, db: store.kind }); }
+  catch (e) { res.status(503).json({ ok: false, db: store.kind, error: e.message }); }
 });
 
 // Espera a que las tablas existan antes de atender la API.
-// Si la base no está lista (p.ej. falta DATABASE_URL), responde claro sin crashear.
 app.use("/api", async (_req, res, next) => {
   try { await store.ready; next(); }
   catch (e) {
@@ -72,8 +62,8 @@ function requireAdmin(req, res, next) {
 /* ---------- Estado público (sin comprobantes ni PINs) ---------- */
 app.get("/api/state", async (_req, res, next) => {
   try {
-    const [players, predRows, resultRows] = await Promise.all([
-      store.allPlayers(), store.allPredictions(), store.allResults(),
+    const [players, predRows, resultRows, matches] = await Promise.all([
+      store.allPlayers(), store.allPredictions(), store.allResults(), store.allMatches(),
     ]);
     const results = {};
     for (const r of resultRows) results[r.match_id] = { h: r.h, a: r.a };
@@ -84,23 +74,27 @@ app.get("/api/state", async (_req, res, next) => {
       const predictions = predsByPlayer[pl.name] || {};
       const perMatch = {};
       let points = 0;
-      for (const m of MATCHES) {
+      for (const m of matches) {
         const pts = scoreMatch(predictions[m.id], results[m.id]);
         perMatch[m.id] = pts;
         points += pts;
       }
       return {
-        name: pl.name,
-        fav: pl.fav,
-        paid: !!pl.receipt,
+        name: pl.name, fav: pl.fav, paid: !!pl.receipt,
         predictions, perMatch, points,
         filled: Object.keys(predictions).length,
       };
     });
     out.sort((a, b) => b.points - a.points || a.name.localeCompare(b.name));
+
+    const matchesOut = matches.map((m) => ({
+      id: m.id, round: m.round, group: m.grp, home: m.home, away: m.away,
+      deadline: matchDeadline(m), locked: matchLocked(m),
+    }));
+
     res.json({
-      players: out, results, totalMatches: MATCHES.length,
-      deadline: DEADLINE_ISO, locked: isLocked(),
+      players: out, results, matches: matchesOut,
+      totalMatches: matches.length, deadline: DEADLINE_ISO,
     });
   } catch (e) { next(e); }
 });
@@ -150,21 +144,29 @@ app.post("/api/login", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
-/* ---------- Guardar pronósticos (requiere PIN del jugador) ---------- */
+/* ---------- Guardar pronósticos (requiere PIN; respeta el cierre por partido) ---------- */
 app.post("/api/predictions", async (req, res, next) => {
   try {
     const name = (req.body.name || "").trim();
     const pin = (req.body.pin || "").trim();
-    if (isLocked())
-      return res.status(403).json({ error: "⏰ La quiniela ya cerró. ¡Que empiece el Mundial!" });
     const player = await store.getPlayer(name);
     if (!player) return res.status(404).json({ error: "Regístrate primero" });
     if (player.pin_hash !== hashPin(pin))
       return res.status(403).json({ error: "PIN incorrecto: esa quiniela no es tuya 😏" });
 
-    const entries = toEntries(req.body.predictions);
-    await store.replacePredictions(name, entries);
-    res.json({ ok: true, count: entries.length });
+    const matches = await store.allMatches();
+    const byId = Object.fromEntries(matches.map((m) => [m.id, m]));
+    const preds = req.body.predictions || {};
+    let saved = 0, locked = 0;
+    for (const [mid, val] of Object.entries(preds)) {
+      const m = byId[mid];
+      if (!m) continue;
+      if (matchLocked(m)) { locked++; continue; } // no se toca un partido ya cerrado
+      if (hasBoth(val)) { await store.upsertPrediction(name, mid, clampScore(val.h), clampScore(val.a)); saved++; }
+      else { await store.deletePrediction(name, mid); }
+    }
+    const total = (await store.allPredictions()).filter((p) => p.player_name === name).length;
+    res.json({ ok: true, saved, locked, count: total });
   } catch (e) { next(e); }
 });
 
@@ -186,7 +188,45 @@ app.get("/api/admin/players", requireAdmin, async (_req, res, next) => {
 
 app.post("/api/admin/results", requireAdmin, async (req, res, next) => {
   try {
-    await store.replaceResults(toEntries(req.body.results));
+    const matches = await store.allMatches();
+    const valid = new Set(matches.map((m) => m.id));
+    for (const [mid, val] of Object.entries(req.body.results || {})) {
+      if (!valid.has(mid)) continue;
+      if (hasBoth(val)) await store.upsertResult(mid, clampScore(val.h), clampScore(val.a));
+      else await store.deleteResult(mid);
+    }
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// Agregar un partido (p.ej. de eliminatorias) con su propio cierre
+app.post("/api/admin/match", requireAdmin, async (req, res, next) => {
+  try {
+    const round = (req.body.round || "").trim();
+    const grp = (req.body.grp || "").trim() || null;
+    const home = (req.body.home || "").trim();
+    const away = (req.body.away || "").trim();
+    const deadline = (req.body.deadline || "").trim() || null;
+    if (!round) return res.status(400).json({ error: "Falta la ronda" });
+    if (!TEAMS[home] || !TEAMS[away]) return res.status(400).json({ error: "Equipos inválidos" });
+    if (home === away) return res.status(400).json({ error: "Un equipo no puede jugar contra sí mismo" });
+    if (deadline && isNaN(Date.parse(deadline))) return res.status(400).json({ error: "Fecha de cierre inválida" });
+
+    const matches = await store.allMatches();
+    const ord = matches.reduce((mx, m) => Math.max(mx, m.ord || 0), 0) + 1;
+    const id = "k_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    await store.insertMatch({ id, round, grp, home, away, deadline, ord });
+    res.json({ ok: true, id });
+  } catch (e) { next(e); }
+});
+
+// Borrar un partido (solo eliminatorias; los de Grupos quedan protegidos)
+app.delete("/api/admin/match/:id", requireAdmin, async (req, res, next) => {
+  try {
+    const m = (await store.allMatches()).find((x) => x.id === req.params.id);
+    if (!m) return res.status(404).json({ error: "No existe ese partido" });
+    if (m.round === "Grupos") return res.status(400).json({ error: "No se pueden borrar partidos de la fase de grupos" });
+    await store.deleteMatch(req.params.id);
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

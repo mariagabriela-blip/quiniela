@@ -27,8 +27,9 @@ if (usePostgres) {
     kind: "missing",
     ready,
     allPlayers: fail, getPlayer: fail, savePlayer: fail,
-    allPredictions: fail, replacePredictions: fail,
-    allResults: fail, replaceResults: fail, reset: fail,
+    allMatches: fail, insertMatch: fail, deleteMatch: fail,
+    allPredictions: fail, upsertPrediction: fail, deletePrediction: fail,
+    allResults: fail, upsertResult: fail, deleteResult: fail, reset: fail,
   };
 } else {
   module.exports = require("./store-sqlite");

@@ -126,6 +126,27 @@
       <p class="muted">Carga los resultados <b>reales</b> de cada partido para calcular los puntos.</p>
       <div id="adminMatches" class="matches"></div>
       <button id="saveResults" class="btn-primary">💾 Guardar resultados reales</button>
+
+      <hr/>
+      <h3>➕ Agregar partido (eliminatorias)</h3>
+      <p class="muted small">Cuando se sepan los equipos de octavos, cuartos, etc., agrégalos aquí. Cada partido cierra en la fecha/hora que pongas (hora de tu teléfono).</p>
+      <form id="addMatchCard" class="card" onsubmit="return false">
+        <label>Ronda
+          <select id="amRound"></select>
+        </label>
+        <label>Equipo local
+          <select id="amHome"></select>
+        </label>
+        <label>Equipo visitante
+          <select id="amAway"></select>
+        </label>
+        <label>Cierra (fecha y hora)
+          <input type="datetime-local" id="amDeadline" />
+        </label>
+        <button id="addMatchBtn" class="btn-primary" type="button">➕ Agregar partido</button>
+      </form>
+      <div id="adminKnockouts"></div>
+
       <hr/>
       <h3>👥 Jugadores registrados</h3>
       <div id="adminPlayers"></div>

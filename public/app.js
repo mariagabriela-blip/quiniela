@@ -245,51 +245,66 @@ function renderCurrentPlayer() {
 }
 
 /* ============================================================
-   CIERRE DE LA QUINIELA (cuenta regresiva)
+   PARTIDOS (vienen del estado/servidor; pueden crecer por rondas)
    ============================================================ */
-function deadlineMs() {
-  // El estado manda; si aún no cargó, usa la constante compartida
-  const iso = (lastState && lastState.deadline) || (typeof DEADLINE !== "undefined" ? DEADLINE : null);
-  const ms = iso ? Date.parse(iso) : NaN;
-  return Number.isFinite(ms) ? ms : null;
+function getMatches() { return (lastState && lastState.matches) || []; }
+function matchesByRound() {
+  const rounds = []; const idx = {};
+  for (const m of getMatches()) {
+    if (!(m.round in idx)) { idx[m.round] = rounds.length; rounds.push({ round: m.round, items: [] }); }
+    rounds[idx[m.round]].items.push(m);
+  }
+  return rounds;
 }
-function isLocked() {
-  if (lastState && typeof lastState.locked === "boolean" && lastState.locked) return true;
-  const dl = deadlineMs();
-  return dl != null && Date.now() >= dl;
+function openMatches() { return getMatches().filter((m) => !m.locked); }
+function roundLabel(r) {
+  const map = {
+    Grupos: "⚽ Fase de Grupos", Dieciseisavos: "🏟️ Dieciseisavos",
+    Octavos: "🔥 Octavos de final", Cuartos: "💪 Cuartos de final",
+    Semifinal: "😱 Semifinales", "3er puesto": "🥉 Tercer puesto", Final: "🏆 LA FINAL",
+  };
+  return map[r] || ("🏟️ " + r);
 }
-function countdownText() {
-  const dl = deadlineMs();
-  if (dl == null) return "";
-  let s = Math.max(0, Math.floor((dl - Date.now()) / 1000));
+
+/* ============================================================
+   CIERRE / CUENTA REGRESIVA (por partido)
+   ============================================================ */
+function countdownTo(ms) {
+  let s = Math.max(0, Math.floor((ms - Date.now()) / 1000));
   const d = Math.floor(s / 86400); s -= d * 86400;
   const h = Math.floor(s / 3600); s -= h * 3600;
   const m = Math.floor(s / 60); s -= m * 60;
   return `${d}d ${h}h ${m}m ${s}s`;
 }
+function nextDeadlineMs() {
+  const ds = openMatches().map((m) => Date.parse(m.deadline)).filter(Number.isFinite);
+  return ds.length ? Math.min(...ds) : null;
+}
 function renderDeadlineBanner() {
   const el = $("#deadlineBanner");
   if (!el) return;
-  const dl = deadlineMs();
-  if (dl == null) { el.className = "deadline"; el.innerHTML = ""; return; }
-  const fecha = new Date(dl).toLocaleString("es-VE", {
-    day: "2-digit", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
-  });
-  if (isLocked()) {
+  const matches = getMatches();
+  if (!matches.length) { el.className = "deadline"; el.innerHTML = ""; return; }
+  const open = openMatches();
+  if (!open.length) {
     el.className = "deadline locked";
-    el.innerHTML = `🔒 <b>La quiniela está cerrada.</b> Cerró el ${fecha}. ¡Que ruede el balón! ⚽`;
-  } else {
-    el.className = "deadline open";
-    const rec = myRecord();
-    let faltan = "";
-    if (rec) {
-      const n = (lastState.totalMatches || MATCHES.length) - rec.filled;
-      faltan = n > 0
-        ? ` · <b>te faltan ${n} partido${n === 1 ? "" : "s"}</b> por llenar ⚠️`
-        : " · ¡ya llenaste todo! ✅";
-    }
-    el.innerHTML = `⏰ Editas hasta el <b>${fecha}</b> · cierra en <b>${countdownText()}</b>${faltan}`;
+    el.innerHTML = "🔒 <b>No hay partidos abiertos ahora.</b> Espera a que el admin cargue la siguiente ronda. ⚽";
+    return;
   }
+  const ms = nextDeadlineMs();
+  const fecha = new Date(ms).toLocaleString("es-VE", {
+    day: "2-digit", month: "long", hour: "2-digit", minute: "2-digit",
+  });
+  const rec = myRecord();
+  let faltan = "";
+  if (rec) {
+    const openIds = new Set(open.map((m) => m.id));
+    const filledOpen = Object.keys(rec.predictions || {}).filter((id) => openIds.has(id)).length;
+    const n = open.length - filledOpen;
+    faltan = n > 0 ? ` · <b>te faltan ${n}</b> por llenar ⚠️` : " · ¡llenaste los abiertos! ✅";
+  }
+  el.className = "deadline open";
+  el.innerHTML = `⏰ Próximo cierre: <b>${fecha}</b> · en <b>${countdownTo(ms)}</b>${faltan}`;
 }
 
 /* ============================================================
@@ -306,30 +321,36 @@ function renderQuiniela() {
     return;
   }
   need.classList.add("hidden");
-  const locked = isLocked();
-  saveBtn.classList.toggle("hidden", locked);
+  saveBtn.classList.toggle("hidden", !openMatches().length);
   const preds = rec.predictions || {};
-  const dis = locked ? "disabled" : "";
-  list.innerHTML = MATCHES.map((m) => {
-    const p = preds[m.id] || {};
-    return `<div class="match">
-      <div class="grp">Grupo ${m.group}</div>
-      ${teamHTML(m.home)}
-      <div class="vs">
-        <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="h" value="${p.h ?? ""}" ${dis} />
-        <span class="x">vs</span>
-        <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="a" value="${p.a ?? ""}" ${dis} />
-      </div>
-      ${teamHTML(m.away)}
-    </div>`;
+
+  list.innerHTML = matchesByRound().map((r) => {
+    const header = `<div class="round-head">${roundLabel(r.round)}</div>`;
+    const items = r.items.map((m) => {
+      const p = preds[m.id] || {};
+      const dis = m.locked ? "disabled" : "";
+      const sub = m.group ? `Grupo ${m.group}` : r.round;
+      const lock = m.locked ? ' <span class="lockt">🔒 cerrado</span>' : "";
+      return `<div class="match${m.locked ? " mlocked" : ""}">
+        <div class="grp">${sub}${lock}</div>
+        ${teamHTML(m.home)}
+        <div class="vs">
+          <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="h" value="${p.h ?? ""}" ${dis} />
+          <span class="x">vs</span>
+          <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="a" value="${p.a ?? ""}" ${dis} />
+        </div>
+        ${teamHTML(m.away)}
+      </div>`;
+    }).join("");
+    return header + items;
   }).join("");
 }
 
 $("#saveQuiniela").addEventListener("click", async () => {
   if (!me) return;
-  if (isLocked()) { renderQuiniela(); return toast("⏰ La quiniela ya cerró. ¡A ver los partidos!"); }
   const predictions = {};
   $$("#matchesList .score-in").forEach((inp) => {
+    if (inp.disabled) return; // no enviar los partidos ya cerrados
     const mid = inp.dataset.mid, side = inp.dataset.side;
     (predictions[mid] ||= {})[side] = inp.value === "" ? null : clampScore(inp.value);
   });
@@ -340,7 +361,7 @@ $("#saveQuiniela").addEventListener("click", async () => {
       body: JSON.stringify({ name: me.name, pin: me.pin, predictions }),
     });
     fireConfetti();
-    toast(`¡Quiniela guardada! ${r.count}/${lastState.totalMatches} partidos. 🤞`);
+    toast(`¡Guardado! Llevas ${r.count}/${lastState.totalMatches} partidos. 🤞`);
     await refreshState();
   } catch (err) { toast("⚠️ " + err.message); }
 });
@@ -396,12 +417,12 @@ function renderLeaderboard() {
       $$(".lb-detail").forEach((d) => d.classList.add("hidden"));
       if (open) return;
       const p = players[i];
-      det.innerHTML = MATCHES.map((m) => {
+      det.innerHTML = getMatches().map((m) => {
         const pr = p.predictions[m.id];
         const rr = lastState.results[m.id];
         const guess = pr ? `${pr.h}-${pr.a}` : "—";
         const real = rr ? `${rr.h}-${rr.a}` : "·";
-        const pts = anyResults ? `<b>+${p.perMatch[m.id]}</b>` : "";
+        const pts = anyResults ? `<b>+${p.perMatch[m.id] || 0}</b>` : "";
         return `<div class="det-row">
           <span>${teamFlag(m.home)} vs ${teamFlag(m.away)}</span>
           <span class="g">tú: ${guess}</span>
@@ -450,19 +471,28 @@ async function promptAdmin() {
 
 async function renderAdmin() {
   if (!adminPin) return promptAdmin();
-  $("#adminMatches").innerHTML = MATCHES.map((m) => {
-    const r = lastState.results[m.id] || {};
-    return `<div class="match">
-      <div class="grp">Grupo ${m.group}</div>
-      ${teamHTML(m.home)}
-      <div class="vs">
-        <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="h" value="${r.h ?? ""}" />
-        <span class="x">vs</span>
-        <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="a" value="${r.a ?? ""}" />
-      </div>
-      ${teamHTML(m.away)}
-    </div>`;
+
+  // Resultados reales, agrupados por ronda
+  $("#adminMatches").innerHTML = matchesByRound().map((r) => {
+    const header = `<div class="round-head">${roundLabel(r.round)}</div>`;
+    const items = r.items.map((m) => {
+      const rr = lastState.results[m.id] || {};
+      const sub = m.group ? `Grupo ${m.group}` : r.round;
+      return `<div class="match">
+        <div class="grp">${sub}</div>
+        ${teamHTML(m.home)}
+        <div class="vs">
+          <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="h" value="${rr.h ?? ""}" />
+          <span class="x">vs</span>
+          <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="a" value="${rr.a ?? ""}" />
+        </div>
+        ${teamHTML(m.away)}
+      </div>`;
+    }).join("");
+    return header + items;
   }).join("");
+
+  renderAddMatch();
 
   // jugadores + comprobantes (solo admin)
   const pa = $("#adminPlayers");
@@ -482,6 +512,62 @@ async function renderAdmin() {
       : '<p class="empty">No hay jugadores todavía.</p>';
   } catch (e) { pa.innerHTML = `<p class="empty">⚠️ ${e.message}</p>`; }
 }
+
+function teamOptions(sel) {
+  return '<option value="">— equipo —</option>' +
+    Object.entries(TEAMS).map(([c, t]) => `<option value="${c}" ${c === sel ? "selected" : ""}>${t.flag} ${t.name}</option>`).join("");
+}
+function renderAddMatch() {
+  const rounds = ["Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "3er puesto", "Final"];
+  $("#amRound").innerHTML = rounds.map((r) => `<option value="${r}">${r}</option>`).join("");
+  $("#amHome").innerHTML = teamOptions();
+  $("#amAway").innerHTML = teamOptions();
+
+  const kos = getMatches().filter((m) => m.round !== "Grupos");
+  const box = $("#adminKnockouts");
+  box.innerHTML = kos.length
+    ? kos.map((m) => {
+        const cierre = m.deadline ? new Date(m.deadline).toLocaleString("es-VE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+        return `<div class="player-admin">
+          <span class="pa-name">${roundLabel(m.round)}: ${teamFlag(m.home)} ${TEAMS[m.home]?.name || m.home} vs ${teamFlag(m.away)} ${TEAMS[m.away]?.name || m.away}<br><span class="muted small">cierra: ${cierre}</span></span>
+          <button class="btn-danger btn-mini" data-del="${m.id}">🗑️</button>
+        </div>`;
+      }).join("")
+    : '<p class="muted small">Aún no has agregado partidos de eliminatorias. Hazlo cuando se sepan los equipos de cada ronda.</p>';
+
+  box.querySelectorAll("[data-del]").forEach((b) =>
+    b.addEventListener("click", async () => {
+      if (!confirm("¿Borrar este partido y sus pronósticos/resultado?")) return;
+      try {
+        await api("/api/admin/match/" + b.dataset.del, { method: "DELETE", headers: { "x-admin-pin": adminPin } });
+        toast("Partido borrado 🗑️");
+        await refreshState();
+      } catch (e) { toast("⚠️ " + e.message); }
+    })
+  );
+}
+
+$("#addMatchBtn")?.addEventListener("click", async () => {
+  if (!adminPin) return promptAdmin();
+  const round = $("#amRound").value;
+  const home = $("#amHome").value, away = $("#amAway").value;
+  const dlLocal = $("#amDeadline").value;
+  if (!home || !away) return toast("Elige los dos equipos");
+  if (home === away) return toast("No puede ser el mismo equipo");
+  let deadline = null;
+  if (dlLocal) { const d = new Date(dlLocal); if (!isNaN(d)) deadline = d.toISOString(); }
+  try {
+    await api("/api/admin/match", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-pin": adminPin },
+      body: JSON.stringify({ round, home, away, deadline }),
+    });
+    fireConfetti();
+    toast("¡Partido agregado! ⚽");
+    $("#amHome").value = ""; $("#amAway").value = ""; $("#amDeadline").value = "";
+    await refreshState();
+  } catch (e) { toast("⚠️ " + e.message); }
+});
 
 $("#saveResults").addEventListener("click", async () => {
   if (!adminPin) return promptAdmin();

@@ -4,6 +4,7 @@
    Implementa la misma interfaz async que store-sqlite.js.
    ============================================================ */
 const { Pool } = require("pg");
+const { MATCHES, DEADLINE } = require("../public/shared-data.js");
 
 const connectionString =
   process.env.DATABASE_URL ||
@@ -16,29 +17,58 @@ const ssl = process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: 
 const pool = new Pool({ connectionString, ssl, max: 3 });
 pool.on("error", (e) => console.error("Postgres pool error:", e.message));
 
-const ready = pool.query(`
-  CREATE TABLE IF NOT EXISTS players (
-    name       TEXT PRIMARY KEY,
-    fav        TEXT,
-    receipt    TEXT,
-    pin_hash   TEXT,
-    created_at BIGINT
-  );
-  CREATE TABLE IF NOT EXISTS predictions (
-    player_name TEXT,
-    match_id    TEXT,
-    h           INTEGER,
-    a           INTEGER,
-    PRIMARY KEY (player_name, match_id)
-  );
-  CREATE TABLE IF NOT EXISTS results (
-    match_id TEXT PRIMARY KEY,
-    h        INTEGER,
-    a        INTEGER
-  );
-`).then(() => {});
-// Evita que un fallo de conexión al arrancar tumbe la función (unhandledRejection).
-// Quien haga `await store.ready` igual verá el error y responderá con un mensaje claro.
+const ready = (async () => {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS players (
+      name       TEXT PRIMARY KEY,
+      fav        TEXT,
+      receipt    TEXT,
+      pin_hash   TEXT,
+      created_at BIGINT
+    );
+    CREATE TABLE IF NOT EXISTS matches (
+      id       TEXT PRIMARY KEY,
+      round    TEXT,
+      grp      TEXT,
+      home     TEXT,
+      away     TEXT,
+      deadline TEXT,
+      ord      INTEGER
+    );
+    CREATE TABLE IF NOT EXISTS predictions (
+      player_name TEXT,
+      match_id    TEXT,
+      h           INTEGER,
+      a           INTEGER,
+      PRIMARY KEY (player_name, match_id)
+    );
+    CREATE TABLE IF NOT EXISTS results (
+      match_id TEXT PRIMARY KEY,
+      h        INTEGER,
+      a        INTEGER
+    );
+  `);
+  // Siembra los partidos de la fase de grupos la primera vez.
+  const { rows } = await pool.query("SELECT COUNT(*)::int AS n FROM matches");
+  if (rows[0].n === 0) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      for (let i = 0; i < MATCHES.length; i++) {
+        const m = MATCHES[i];
+        await client.query(
+          "INSERT INTO matches (id, round, grp, home, away, deadline, ord) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+          [m.id, "Grupos", m.group, m.home, m.away, DEADLINE, i]
+        );
+      }
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK"); throw e;
+    } finally {
+      client.release();
+    }
+  }
+})();
 ready.catch((e) => console.error("Error inicializando Postgres:", e.message));
 
 module.exports = {
@@ -61,53 +91,64 @@ module.exports = {
       [p.name, p.fav, p.receipt, p.pin_hash, p.created_at]
     );
   },
+
+  async allMatches() {
+    const { rows } = await pool.query("SELECT * FROM matches ORDER BY ord ASC");
+    return rows;
+  },
+  async insertMatch(m) {
+    await pool.query(
+      "INSERT INTO matches (id, round, grp, home, away, deadline, ord) VALUES ($1,$2,$3,$4,$5,$6,$7)",
+      [m.id, m.round, m.grp, m.home, m.away, m.deadline, m.ord]
+    );
+  },
+  async deleteMatch(id) {
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      await client.query("DELETE FROM matches WHERE id = $1", [id]);
+      await client.query("DELETE FROM predictions WHERE match_id = $1", [id]);
+      await client.query("DELETE FROM results WHERE match_id = $1", [id]);
+      await client.query("COMMIT");
+    } catch (e) {
+      await client.query("ROLLBACK"); throw e;
+    } finally {
+      client.release();
+    }
+  },
+
   async allPredictions() {
     const { rows } = await pool.query("SELECT * FROM predictions");
     return rows;
   },
-  async replacePredictions(name, entries) {
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      await client.query("DELETE FROM predictions WHERE player_name = $1", [name]);
-      for (const e of entries) {
-        await client.query(
-          "INSERT INTO predictions (player_name, match_id, h, a) VALUES ($1, $2, $3, $4)",
-          [name, e.match_id, e.h, e.a]
-        );
-      }
-      await client.query("COMMIT");
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
+  async upsertPrediction(name, matchId, h, a) {
+    await pool.query(
+      `INSERT INTO predictions (player_name, match_id, h, a) VALUES ($1,$2,$3,$4)
+       ON CONFLICT (player_name, match_id) DO UPDATE SET h = $3, a = $4`,
+      [name, matchId, h, a]
+    );
   },
+  async deletePrediction(name, matchId) {
+    await pool.query("DELETE FROM predictions WHERE player_name = $1 AND match_id = $2", [name, matchId]);
+  },
+
   async allResults() {
     const { rows } = await pool.query("SELECT * FROM results");
     return rows;
   },
-  async replaceResults(entries) {
-    const client = await pool.connect();
-    try {
-      await client.query("BEGIN");
-      await client.query("DELETE FROM results");
-      for (const e of entries) {
-        await client.query(
-          "INSERT INTO results (match_id, h, a) VALUES ($1, $2, $3)",
-          [e.match_id, e.h, e.a]
-        );
-      }
-      await client.query("COMMIT");
-    } catch (err) {
-      await client.query("ROLLBACK");
-      throw err;
-    } finally {
-      client.release();
-    }
+  async upsertResult(matchId, h, a) {
+    await pool.query(
+      `INSERT INTO results (match_id, h, a) VALUES ($1,$2,$3)
+       ON CONFLICT (match_id) DO UPDATE SET h = $2, a = $3`,
+      [matchId, h, a]
+    );
   },
+  async deleteResult(matchId) {
+    await pool.query("DELETE FROM results WHERE match_id = $1", [matchId]);
+  },
+
   async reset() {
+    // Borra jugadores, pronósticos y resultados. Conserva el fixture (matches).
     await pool.query("DELETE FROM predictions");
     await pool.query("DELETE FROM results");
     await pool.query("DELETE FROM players");
