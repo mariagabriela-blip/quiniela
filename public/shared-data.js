@@ -28,52 +28,94 @@
      (En el servidor también puedes sobrescribirla con la variable QUINIELA_DEADLINE.) */
   const DEADLINE = "2026-06-11T00:00:00-04:00";
 
+  /* ---------- Equipos (sorteo final del 5 de diciembre de 2025) ---------- */
   const TEAMS = {
-    ARG: { name: "Argentina",      flag: "🇦🇷" },
-    BRA: { name: "Brasil",         flag: "🇧🇷" },
-    FRA: { name: "Francia",        flag: "🇫🇷" },
-    ESP: { name: "España",         flag: "🇪🇸" },
-    ENG: { name: "Inglaterra",     flag: "🏴" },
-    GER: { name: "Alemania",       flag: "🇩🇪" },
-    POR: { name: "Portugal",       flag: "🇵🇹" },
-    NED: { name: "Países Bajos",   flag: "🇳🇱" },
-    URU: { name: "Uruguay",        flag: "🇺🇾" },
-    COL: { name: "Colombia",       flag: "🇨🇴" },
-    USA: { name: "Estados Unidos", flag: "🇺🇸" },
-    MEX: { name: "México",         flag: "🇲🇽" },
-    CAN: { name: "Canadá",         flag: "🇨🇦" },
-    BEL: { name: "Bélgica",        flag: "🇧🇪" },
-    CRO: { name: "Croacia",        flag: "🇭🇷" },
-    MAR: { name: "Marruecos",      flag: "🇲🇦" },
-    JPN: { name: "Japón",          flag: "🇯🇵" },
-    SEN: { name: "Senegal",        flag: "🇸🇳" },
-    ECU: { name: "Ecuador",        flag: "🇪🇨" },
-    VEN: { name: "Venezuela",      flag: "🇻🇪" },
-    CHI: { name: "Chile",          flag: "🇨🇱" },
-    PER: { name: "Perú",           flag: "🇵🇪" },
-    KOR: { name: "Corea del Sur",  flag: "🇰🇷" },
-    AUS: { name: "Australia",      flag: "🇦🇺" },
+    // Grupo A
+    MEX: { name: "México",            flag: "🇲🇽" },
+    RSA: { name: "Sudáfrica",         flag: "🇿🇦" },
+    KOR: { name: "Corea del Sur",     flag: "🇰🇷" },
+    CZE: { name: "Chequia",           flag: "🇨🇿" },
+    // Grupo B
+    CAN: { name: "Canadá",            flag: "🇨🇦" },
+    BIH: { name: "Bosnia y Herzeg.",  flag: "🇧🇦" },
+    QAT: { name: "Catar",             flag: "🇶🇦" },
+    SUI: { name: "Suiza",             flag: "🇨🇭" },
+    // Grupo C
+    BRA: { name: "Brasil",            flag: "🇧🇷" },
+    MAR: { name: "Marruecos",         flag: "🇲🇦" },
+    HAI: { name: "Haití",             flag: "🇭🇹" },
+    SCO: { name: "Escocia",           flag: "🏴󠁧󠁢󠁳󠁣󠁴󠁿" },
+    // Grupo D
+    USA: { name: "Estados Unidos",    flag: "🇺🇸" },
+    PAR: { name: "Paraguay",          flag: "🇵🇾" },
+    AUS: { name: "Australia",         flag: "🇦🇺" },
+    TUR: { name: "Turquía",           flag: "🇹🇷" },
+    // Grupo E
+    GER: { name: "Alemania",          flag: "🇩🇪" },
+    CUW: { name: "Curazao",           flag: "🇨🇼" },
+    CIV: { name: "Costa de Marfil",   flag: "🇨🇮" },
+    ECU: { name: "Ecuador",           flag: "🇪🇨" },
+    // Grupo F
+    NED: { name: "Países Bajos",      flag: "🇳🇱" },
+    JPN: { name: "Japón",             flag: "🇯🇵" },
+    SWE: { name: "Suecia",            flag: "🇸🇪" },
+    TUN: { name: "Túnez",             flag: "🇹🇳" },
+    // Grupo G
+    BEL: { name: "Bélgica",           flag: "🇧🇪" },
+    EGY: { name: "Egipto",            flag: "🇪🇬" },
+    IRN: { name: "Irán",              flag: "🇮🇷" },
+    NZL: { name: "Nueva Zelanda",     flag: "🇳🇿" },
+    // Grupo H
+    ESP: { name: "España",            flag: "🇪🇸" },
+    CPV: { name: "Cabo Verde",        flag: "🇨🇻" },
+    KSA: { name: "Arabia Saudita",    flag: "🇸🇦" },
+    URU: { name: "Uruguay",           flag: "🇺🇾" },
+    // Grupo I
+    FRA: { name: "Francia",           flag: "🇫🇷" },
+    SEN: { name: "Senegal",           flag: "🇸🇳" },
+    IRQ: { name: "Irak",              flag: "🇮🇶" },
+    NOR: { name: "Noruega",           flag: "🇳🇴" },
+    // Grupo J
+    ARG: { name: "Argentina",         flag: "🇦🇷" },
+    ALG: { name: "Argelia",           flag: "🇩🇿" },
+    AUT: { name: "Austria",           flag: "🇦🇹" },
+    JOR: { name: "Jordania",          flag: "🇯🇴" },
+    // Grupo K
+    POR: { name: "Portugal",          flag: "🇵🇹" },
+    COD: { name: "RD Congo",          flag: "🇨🇩" },
+    UZB: { name: "Uzbekistán",        flag: "🇺🇿" },
+    COL: { name: "Colombia",          flag: "🇨🇴" },
+    // Grupo L
+    ENG: { name: "Inglaterra",        flag: "🏴󠁧󠁢󠁥󠁮󠁧󠁿" },
+    CRO: { name: "Croacia",           flag: "🇭🇷" },
+    GHA: { name: "Ghana",             flag: "🇬🇭" },
+    PAN: { name: "Panamá",            flag: "🇵🇦" },
   };
 
-  /* Partidos a pronosticar. id único. home/away son claves de TEAMS. */
-  const MATCHES = [
-    { id: "m1",  group: "A", home: "MEX", away: "VEN" },
-    { id: "m2",  group: "A", home: "USA", away: "CAN" },
-    { id: "m3",  group: "B", home: "ARG", away: "CHI" },
-    { id: "m4",  group: "B", home: "BRA", away: "PER" },
-    { id: "m5",  group: "C", home: "FRA", away: "SEN" },
-    { id: "m6",  group: "C", home: "ESP", away: "MAR" },
-    { id: "m7",  group: "D", home: "ENG", away: "USA" },
-    { id: "m8",  group: "D", home: "GER", away: "JPN" },
-    { id: "m9",  group: "E", home: "POR", away: "URU" },
-    { id: "m10", group: "E", home: "NED", away: "ECU" },
-    { id: "m11", group: "F", home: "BEL", away: "CRO" },
-    { id: "m12", group: "F", home: "COL", away: "KOR" },
-    { id: "m13", group: "G", home: "ARG", away: "BRA" },
-    { id: "m14", group: "G", home: "FRA", away: "ESP" },
-    { id: "m15", group: "H", home: "ENG", away: "GER" },
-    { id: "m16", group: "H", home: "POR", away: "NED" },
-  ];
+  /* ---------- Grupos del Mundial 2026 (orden de cabezas de serie) ---------- */
+  const GROUPS = {
+    A: ["MEX", "RSA", "KOR", "CZE"],
+    B: ["CAN", "BIH", "QAT", "SUI"],
+    C: ["BRA", "MAR", "HAI", "SCO"],
+    D: ["USA", "PAR", "AUS", "TUR"],
+    E: ["GER", "CUW", "CIV", "ECU"],
+    F: ["NED", "JPN", "SWE", "TUN"],
+    G: ["BEL", "EGY", "IRN", "NZL"],
+    H: ["ESP", "CPV", "KSA", "URU"],
+    I: ["FRA", "SEN", "IRQ", "NOR"],
+    J: ["ARG", "ALG", "AUT", "JOR"],
+    K: ["POR", "COD", "UZB", "COL"],
+    L: ["ENG", "CRO", "GHA", "PAN"],
+  };
+
+  /* Los 6 partidos de cada grupo (todas las combinaciones). 12 grupos x 6 = 72. */
+  const PAIRINGS = [[0, 1], [2, 3], [0, 2], [1, 3], [0, 3], [1, 2]];
+  const MATCHES = [];
+  for (const [g, teams] of Object.entries(GROUPS)) {
+    PAIRINGS.forEach(([i, j], n) => {
+      MATCHES.push({ id: `${g}${n + 1}`, group: g, home: teams[i], away: teams[j] });
+    });
+  }
 
   const JOKES = [
     "¿Por qué los pollos no juegan fútbol? Porque hacen fa-CACAREO al arco. 🐔",
