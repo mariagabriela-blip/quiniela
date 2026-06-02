@@ -128,6 +128,30 @@ $("#receipt").addEventListener("change", async (e) => {
     `<img src="${url}" alt="comprobante" /><p class="small">✅ Listo para subir. ¡A pagar como los grandes!</p>`;
 });
 
+$("#loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const name = $("#loginName").value.trim();
+  const pin = $("#loginPin").value.trim();
+  if (!name || !pin) return toast("Pon tu nombre y tu PIN 🔑");
+  try {
+    await api("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, pin }),
+    });
+    saveMe({ name, pin });
+    $("#loginName").value = ""; $("#loginPin").value = "";
+    toast(`¡Hola de nuevo, ${name}! ⚽`);
+    await refreshState();
+    document.querySelector('.tab[data-tab="quiniela"]').click();
+  } catch (err) { toast("⚠️ " + err.message); }
+});
+
+$("#goLogin")?.addEventListener("click", () => {
+  document.querySelector('.tab[data-tab="registro"]').click();
+  $("#loginName")?.focus();
+});
+
 $("#registroForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = $("#playerName").value.trim();
@@ -156,10 +180,18 @@ $("#registroForm").addEventListener("submit", async (e) => {
   } catch (err) { toast("⚠️ " + err.message); }
 });
 
+function setAuthForms(loggedIn) {
+  // Cuando ya entraste, oculta los formularios de entrar/registrarse
+  ["loginForm", "registroForm"].forEach((id) => $("#" + id)?.classList.toggle("hidden", loggedIn));
+  document.querySelector(".or-sep")?.classList.toggle("hidden", loggedIn);
+  document.querySelector(".reg-title")?.classList.toggle("hidden", loggedIn);
+}
+
 function renderCurrentPlayer() {
   const box = $("#currentPlayerBox");
   const rec = myRecord();
-  if (!me || !rec) { box.classList.add("hidden"); return; }
+  if (!me || !rec) { box.classList.add("hidden"); setAuthForms(false); return; }
+  setAuthForms(true);
   const fav = rec.fav && TEAMS[rec.fav] ? `${TEAMS[rec.fav].flag} ${TEAMS[rec.fav].name}` : "—";
   const paid = rec.paid ? "✅ Comprobante cargado" : "❌ Falta el comprobante";
   box.classList.remove("hidden");

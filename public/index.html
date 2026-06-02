@@ -39,9 +39,24 @@
 
     <!-- ============ REGISTRO ============ -->
     <section class="panel active" id="registro">
-      <h2>📝 Regístrate para jugar</h2>
-      <p class="muted">Pon tu nombre, sube tu comprobante de pago y entra a la guerra. 🔥</p>
+      <h2>📝 Entra o regístrate</h2>
+      <p class="muted">¿Ya tienes perfil? Entra con tu nombre y PIN. ¿Primera vez? Crea tu perfil. 🔥</p>
 
+      <form id="loginForm" class="card">
+        <h3>🔓 Entrar (ya me registré)</h3>
+        <p class="muted small">Con tu <b>mismo nombre y PIN</b> entras a editar tu quiniela desde cualquier teléfono.</p>
+        <label>Tu nombre
+          <input type="text" id="loginName" placeholder="El nombre con que te registraste" maxlength="40" autocomplete="off" />
+        </label>
+        <label>Tu PIN 🔑
+          <input type="password" id="loginPin" placeholder="Tu PIN" maxlength="20" autocomplete="off" />
+        </label>
+        <button type="submit" class="btn-primary">🔓 Entrar a mi quiniela</button>
+      </form>
+
+      <div class="or-sep">— o —</div>
+
+      <h3 class="reg-title">🆕 Crear mi perfil (primera vez)</h3>
       <form id="registroForm" class="card">
         <label>Tu nombre (o apodo de crack)
           <input type="text" id="playerName" placeholder="Ej: Leonela 'La Pulga' Mavarez" required maxlength="40" />
@@ -73,7 +88,10 @@
       <h2>⚽ Carga tu Quiniela</h2>
       <p class="muted">Escribe los goles que crees que meterá cada equipo. ¡Sin miedo!</p>
       <div id="deadlineBanner" class="deadline"></div>
-      <div id="needRegister" class="warn hidden">⚠️ Primero regístrate en la pestaña <b>Registro</b>.</div>
+      <div id="needRegister" class="warn hidden">
+        ⚠️ Para cargar o editar tu quiniela, primero <b>entra con tu nombre y PIN</b> (o regístrate).
+        <button class="btn-primary" id="goLogin">🔓 Ir a Entrar / Registro</button>
+      </div>
       <div id="matchesList" class="matches"></div>
       <button id="saveQuiniela" class="btn-primary hidden">💾 Guardar mi Quiniela</button>
     </section>

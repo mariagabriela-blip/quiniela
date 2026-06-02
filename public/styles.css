@@ -86,6 +86,12 @@ body {
 }
 .hidden { display: none !important; }
 
+/* Texto "muted/small" dentro de tarjetas blancas (si no, queda invisible) */
+.card .muted, .card .muted.small { color: #5a6b54; }
+.or-sep { text-align: center; color: rgba(255,255,255,.85); font-weight: 800; margin: 14px 0; }
+.reg-title { color: #fff; margin-bottom: 10px; text-shadow: 0 2px 6px rgba(0,0,0,.4); }
+#loginForm h3, #registroForm h3 { color: var(--ink); }
+
 /* ============ Forms ============ */
 label { display: flex; flex-direction: column; gap: 6px; font-weight: 700; font-size: .95rem; }
 input[type=text], select, input[type=number] {

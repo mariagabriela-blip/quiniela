@@ -138,6 +138,18 @@ app.post("/api/register", async (req, res, next) => {
   } catch (e) { next(e); }
 });
 
+/* ---------- Entrar (login con nombre + PIN, no modifica nada) ---------- */
+app.post("/api/login", async (req, res, next) => {
+  try {
+    const name = (req.body.name || "").trim();
+    const pin = (req.body.pin || "").trim();
+    const player = await store.getPlayer(name);
+    if (!player) return res.status(404).json({ error: "No existe ese jugador. Regístrate primero." });
+    if (player.pin_hash !== hashPin(pin)) return res.status(403).json({ error: "PIN incorrecto 🚫" });
+    res.json({ ok: true, name });
+  } catch (e) { next(e); }
+});
+
 /* ---------- Guardar pronósticos (requiere PIN del jugador) ---------- */
 app.post("/api/predictions", async (req, res, next) => {
   try {
