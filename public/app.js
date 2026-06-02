@@ -55,7 +55,20 @@ let stateError = null;
 async function refreshState() {
   try { lastState = await api("/api/state"); stateError = null; }
   catch (e) { stateError = e.message; console.warn("Estado:", e.message); }
+  updateConnBanner();
   renderActivePanel();
+}
+function updateConnBanner() {
+  const el = $("#connBanner");
+  if (!el) return;
+  if (stateError) {
+    el.className = "connbar show";
+    el.innerHTML = `🔌 <b>No hay conexión con la base de datos.</b> Lo que cargues NO se guardará. ` +
+      `<span class="small">Avísale al administrador: falta configurar <code>DATABASE_URL</code> en Vercel.</span>`;
+  } else {
+    el.className = "connbar";
+    el.innerHTML = "";
+  }
 }
 function myRecord() {
   return me && lastState.players.find((p) => p.name === me.name) || null;

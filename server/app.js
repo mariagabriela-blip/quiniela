@@ -44,6 +44,16 @@ app.use(express.json({ limit: "8mb" }));
 // Frontend estático (index, styles, app.js, shared-data.js)
 app.use(express.static(path.join(__dirname, "..", "public")));
 
+// Diagnóstico: dice si la base de datos está conectada. Funciona aunque falle.
+app.get("/api/health", async (_req, res) => {
+  try {
+    await store.ready;
+    res.json({ ok: true, db: store.kind, deadline: DEADLINE_ISO, locked: isLocked() });
+  } catch (e) {
+    res.status(503).json({ ok: false, db: store.kind, error: e.message });
+  }
+});
+
 // Espera a que las tablas existan antes de atender la API.
 // Si la base no está lista (p.ej. falta DATABASE_URL), responde claro sin crashear.
 app.use("/api", async (_req, res, next) => {
