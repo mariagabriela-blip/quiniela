@@ -1,7 +1,7 @@
 {
   "name": "quiniela-mundial",
   "version": "1.0.0",
-  "description": "Quiniela del Mundial de Fútbol con backend compartido: registro, pronósticos, comprobante de pago y tabla de posiciones en vivo.",
+  "description": "Quiniela del Mundial de Fútbol con backend compartido: registro con PIN, pronósticos, comprobante de pago y tabla en vivo. Corre con SQLite local o Postgres (Neon/Vercel).",
   "main": "server/server.js",
   "type": "commonjs",
   "scripts": {
@@ -12,8 +12,10 @@
     "node": ">=18"
   },
   "dependencies": {
-    "better-sqlite3": "^11.8.1",
     "express": "^4.21.2",
-    "multer": "^2.0.1"
+    "pg": "^8.13.1"
+  },
+  "optionalDependencies": {
+    "better-sqlite3": "^11.8.1"
   }
 }

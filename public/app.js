@@ -1,26 +1,30 @@
 /* ============================================================
    La Quiniela del Mundial — frontend
-   Habla con el backend (Express + SQLite) por una API REST,
-   así TODOS comparten la misma quiniela y la misma tabla en vivo.
+   Habla con el backend por una API REST, así TODOS comparten la
+   misma quiniela y la misma tabla en vivo.
+   Identidad: nombre + PIN personal (se recuerda en este dispositivo).
    ============================================================ */
 
-const ME_KEY = "quiniela_me";        // solo recuerda "quién soy" en este dispositivo
-let me = localStorage.getItem(ME_KEY) || null;
-let adminPin = null;                 // se guarda en memoria tras login admin
+const ME_KEY = "quiniela_me_v2";
+let me = loadMe();                 // { name, pin } o null
+let adminPin = null;
 let lastState = { players: [], results: {}, totalMatches: MATCHES.length };
 
+function loadMe() { try { return JSON.parse(localStorage.getItem(ME_KEY)); } catch { return null; } }
+function saveMe(v) { me = v; localStorage.setItem(ME_KEY, JSON.stringify(v)); }
+function clearMe() { me = null; localStorage.removeItem(ME_KEY); }
+
 /* ---------- Utilidades ---------- */
-const $ = (sel) => document.querySelector(sel);
-const $$ = (sel) => [...document.querySelectorAll(sel)];
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
 
 function toast(msg) {
   const t = $("#toast");
   t.textContent = msg;
   t.classList.add("show");
   clearTimeout(toast._t);
-  toast._t = setTimeout(() => t.classList.remove("show"), 2800);
+  toast._t = setTimeout(() => t.classList.remove("show"), 2900);
 }
-
 function teamHTML(code) {
   const t = TEAMS[code] || { name: code, flag: "🏳️" };
   return `<div class="team"><span class="fl">${t.flag}</span><span class="nm">${t.name}</span></div>`;
@@ -32,7 +36,14 @@ function clampScore(v) {
   if (n > 30) n = 30;
   return n;
 }
-
+function readFileAsDataURL(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
 async function api(path, opts = {}) {
   const res = await fetch(path, opts);
   let data = null;
@@ -40,18 +51,13 @@ async function api(path, opts = {}) {
   if (!res.ok) throw new Error((data && data.error) || "Error de red");
   return data;
 }
-
 async function refreshState() {
-  try {
-    lastState = await api("/api/state");
-  } catch (e) {
-    console.warn("No se pudo cargar el estado:", e.message);
-  }
+  try { lastState = await api("/api/state"); }
+  catch (e) { console.warn("Estado:", e.message); }
   renderActivePanel();
 }
-
 function myRecord() {
-  return lastState.players.find((p) => p.name === me) || null;
+  return me && lastState.players.find((p) => p.name === me.name) || null;
 }
 
 /* ============================================================
@@ -69,7 +75,6 @@ $$(".tab").forEach((tab) => {
     renderActivePanel();
   });
 });
-
 function renderActivePanel() {
   if (activeTab === "registro") renderCurrentPlayer();
   if (activeTab === "quiniela") renderQuiniela();
@@ -81,7 +86,6 @@ function renderActivePanel() {
    BANDERAS + CHISTES
    ============================================================ */
 $("#heroFlags").textContent = Object.values(TEAMS).map((t) => t.flag).slice(0, 16).join(" ");
-
 (function jokeRotator() {
   const el = $("#joke");
   let i = Math.floor(Math.random() * JOKES.length);
@@ -89,9 +93,7 @@ $("#heroFlags").textContent = Object.values(TEAMS).map((t) => t.flag).slice(0, 1
     el.style.opacity = 0;
     setTimeout(() => { el.textContent = JOKES[i % JOKES.length]; el.style.opacity = 1; i++; }, 350);
   };
-  show();
-  setInterval(show, 6000);
-  el.addEventListener("click", show);
+  show(); setInterval(show, 6000); el.addEventListener("click", show);
 })();
 
 /* ============================================================
@@ -102,35 +104,36 @@ $("#favTeam").innerHTML =
   Object.entries(TEAMS).map(([c, t]) => `<option value="${c}">${t.flag} ${t.name}</option>`).join("");
 
 /* ============================================================
-   REGISTRO
+   REGISTRO (nombre + PIN + comprobante)
    ============================================================ */
-$("#receipt").addEventListener("change", (e) => {
+$("#receipt").addEventListener("change", async (e) => {
   const file = e.target.files[0];
   if (!file) { $("#receiptPreview").innerHTML = ""; return; }
-  const reader = new FileReader();
-  reader.onload = () => {
-    $("#receiptPreview").innerHTML =
-      `<img src="${reader.result}" alt="comprobante" /><p class="small">✅ Listo para subir. ¡A pagar como los grandes!</p>`;
-  };
-  reader.readAsDataURL(file);
+  const url = await readFileAsDataURL(file);
+  $("#receiptPreview").innerHTML =
+    `<img src="${url}" alt="comprobante" /><p class="small">✅ Listo para subir. ¡A pagar como los grandes!</p>`;
 });
 
 $("#registroForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const name = $("#playerName").value.trim();
+  const pin = $("#playerPin").value.trim();
   const fav = $("#favTeam").value;
-  if (!name) { toast("Pon tu nombre, pues 😅"); return; }
+  if (!name) return toast("Pon tu nombre, pues 😅");
+  if (pin.length < 3) return toast("Tu PIN debe tener al menos 3 caracteres 🔑");
 
-  const fd = new FormData();
-  fd.append("name", name);
-  fd.append("fav", fav);
+  let receipt = null;
   const file = $("#receipt").files[0];
-  if (file) fd.append("receipt", file);
+  if (file) receipt = await readFileAsDataURL(file);
 
   try {
-    const r = await api("/api/register", { method: "POST", body: fd });
-    me = name;
-    localStorage.setItem(ME_KEY, me);
+    const r = await api("/api/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, pin, fav, receipt }),
+    });
+    saveMe({ name, pin });
+    $("#playerPin").value = "";
     $("#receipt").value = "";
     $("#receiptPreview").innerHTML = "";
     fireConfetti();
@@ -154,8 +157,8 @@ function renderCurrentPlayer() {
     <p>Puntos actuales: <b>${rec.points} pts</b> 🏅</p>
     <button class="btn-danger" id="logoutBtn">Cambiar de jugador</button>`;
   $("#logoutBtn").addEventListener("click", () => {
-    me = null; localStorage.removeItem(ME_KEY);
-    $("#playerName").value = ""; $("#favTeam").value = "";
+    clearMe();
+    $("#playerName").value = ""; $("#playerPin").value = ""; $("#favTeam").value = "";
     $("#receiptPreview").innerHTML = "";
     renderCurrentPlayer(); renderQuiniela();
     toast("Listo, ¿quién juega ahora? 👀");
@@ -171,15 +174,11 @@ function renderQuiniela() {
   const saveBtn = $("#saveQuiniela");
   const rec = myRecord();
   if (!me || !rec) {
-    need.classList.remove("hidden");
-    list.innerHTML = "";
-    saveBtn.classList.add("hidden");
+    need.classList.remove("hidden"); list.innerHTML = ""; saveBtn.classList.add("hidden");
     return;
   }
-  need.classList.add("hidden");
-  saveBtn.classList.remove("hidden");
+  need.classList.add("hidden"); saveBtn.classList.remove("hidden");
   const preds = rec.predictions || {};
-
   list.innerHTML = MATCHES.map((m) => {
     const p = preds[m.id] || {};
     return `<div class="match">
@@ -206,7 +205,7 @@ $("#saveQuiniela").addEventListener("click", async () => {
     const r = await api("/api/predictions", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: me, predictions }),
+      body: JSON.stringify({ name: me.name, pin: me.pin, predictions }),
     });
     fireConfetti();
     toast(`¡Quiniela guardada! ${r.count}/${lastState.totalMatches} partidos. 🤞`);
@@ -231,9 +230,9 @@ function renderLeaderboard() {
   lb.innerHTML = players.map((p, i) => {
     const fav = p.fav ? teamFlag(p.fav) : "🏳️";
     const paid = p.paid ? "" : ' <small>(sin pago 💸)</small>';
-    const mine = p.name === me ? " is-me" : "";
+    const mine = me && p.name === me.name ? " is-me" : "";
     return `<div class="lb-wrap">
-      <div class="lb-row ${cls[i] || ""}${mine}" data-name="${encodeURIComponent(p.name)}">
+      <div class="lb-row ${cls[i] || ""}${mine}">
         <div class="pos">${medals[i] || (i + 1)}</div>
         <div class="who">${fav} ${p.name}${paid} <span class="tap">👁️ ver quiniela</span></div>
         <div class="pts-badge">${p.points} pts</div>
@@ -242,7 +241,6 @@ function renderLeaderboard() {
     </div>`;
   }).join("");
 
-  // Expandir/colapsar la quiniela de cada jugador
   $$(".lb-row").forEach((row, i) => {
     row.addEventListener("click", () => {
       const det = $("#d-" + i);
@@ -286,10 +284,9 @@ async function promptAdmin() {
   } catch (e) { toast("⚠️ " + e.message); $$(".tab")[0].click(); }
 }
 
-function renderAdmin() {
+async function renderAdmin() {
   if (!adminPin) return promptAdmin();
-  const am = $("#adminMatches");
-  am.innerHTML = MATCHES.map((m) => {
+  $("#adminMatches").innerHTML = MATCHES.map((m) => {
     const r = lastState.results[m.id] || {};
     return `<div class="match">
       <div class="grp">Grupo ${m.group}</div>
@@ -303,20 +300,23 @@ function renderAdmin() {
     </div>`;
   }).join("");
 
+  // jugadores + comprobantes (solo admin)
   const pa = $("#adminPlayers");
-  const players = lastState.players;
-  pa.innerHTML = players.length
-    ? players.map((p) => {
-        const paid = p.paid
-          ? `<span class="pa-paid paid-yes">Pagó ✅</span>`
-          : `<span class="pa-paid paid-no">Sin pago ❌</span>`;
-        const link = p.receipt_url ? ` · <a href="${p.receipt_url}" target="_blank">ver comprobante</a>` : "";
-        return `<div class="player-admin">
-          <span class="pa-name">${p.name}</span>
-          <span>${paid}${link}</span>
-        </div>`;
-      }).join("")
-    : '<p class="empty">No hay jugadores todavía.</p>';
+  try {
+    const { players } = await api("/api/admin/players", { headers: { "x-admin-pin": adminPin } });
+    pa.innerHTML = players.length
+      ? players.map((p) => {
+          const paid = p.paid
+            ? `<span class="pa-paid paid-yes">Pagó ✅</span>`
+            : `<span class="pa-paid paid-no">Sin pago ❌</span>`;
+          const link = p.receipt ? ` · <a href="${p.receipt}" target="_blank">ver comprobante</a>` : "";
+          return `<div class="player-admin">
+            <span class="pa-name">${p.name}</span>
+            <span>${paid}${link}</span>
+          </div>`;
+        }).join("")
+      : '<p class="empty">No hay jugadores todavía.</p>';
+  } catch (e) { pa.innerHTML = `<p class="empty">⚠️ ${e.message}</p>`; }
 }
 
 $("#saveResults").addEventListener("click", async () => {
@@ -385,10 +385,9 @@ tick();
    INIT + auto-refresh en vivo
    ============================================================ */
 (async function init() {
-  if (me) $("#playerName").value = me;
+  if (me) $("#playerName").value = me.name;
   await refreshState();
   const rec = myRecord();
   if (rec && rec.fav) $("#favTeam").value = rec.fav;
-  // Refresca la tabla en vivo cada 8s mientras la estás viendo
   setInterval(() => { if (activeTab === "tabla") refreshState(); }, 8000);
 })();

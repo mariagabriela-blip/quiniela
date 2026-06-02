@@ -45,6 +45,11 @@
           <input type="text" id="playerName" placeholder="Ej: Leonela 'La Pulga' Mavarez" required maxlength="40" />
         </label>
 
+        <label>Tu PIN personal 🔑
+          <span class="muted small">Lo necesitarás para editar TU quiniela. No lo olvides (mínimo 3 caracteres).</span>
+          <input type="password" id="playerPin" placeholder="Ej: 2024" required minlength="3" maxlength="20" autocomplete="new-password" />
+        </label>
+
         <label>Equipo del corazón ❤️
           <select id="favTeam"></select>
         </label>
@@ -113,7 +118,7 @@
   <!-- Toast notifications -->
   <div id="toast" class="toast"></div>
 
-  <script src="data.js"></script>
+  <script src="shared-data.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
