@@ -17,6 +17,8 @@
     root.JOKES = data.JOKES;
     root.scoreMatch = data.scoreMatch;
     root.DEADLINE = data.DEADLINE;
+    root.CUOTA = data.CUOTA;
+    root.MONEDA = data.MONEDA;
   }
 })(typeof self !== "undefined" ? self : this, function () {
 
@@ -27,6 +29,12 @@
      👉 Cambia esta fecha si quieres otro cierre. Formato ISO con zona horaria.
      (En el servidor también puedes sobrescribirla con la variable QUINIELA_DEADLINE.) */
   const DEADLINE = "2026-06-11T00:00:00-04:00";
+
+  /* ---------- El Pozo (premio) ----------
+     Cuánto paga cada jugador y el símbolo de la moneda. El bote se calcula
+     automáticamente: (jugadores que pagaron) x CUOTA. 👉 Cámbialo a tu gusto. */
+  const CUOTA = 10;
+  const MONEDA = "$";
 
   /* ---------- Equipos (sorteo final del 5 de diciembre de 2025) ---------- */
   const TEAMS = {
@@ -152,5 +160,5 @@
     return 0;
   }
 
-  return { TEAMS, MATCHES, JOKES, scoreMatch, DEADLINE };
+  return { TEAMS, MATCHES, JOKES, scoreMatch, DEADLINE, CUOTA, MONEDA };
 });

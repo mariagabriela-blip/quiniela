@@ -140,6 +140,21 @@ input[type=file] { font-size: .9rem; padding: 8px 0; }
 }
 .connbar code { background: rgba(255,255,255,.25); padding: 1px 6px; border-radius: 6px; }
 
+.pozo { display: none; }
+.pozo.show {
+  display: block; text-align: center; margin-bottom: 14px; padding: 14px 16px;
+  border-radius: 14px; font-size: 1.05rem;
+  background: linear-gradient(180deg, var(--gold), var(--gold-dark));
+  color: var(--ink); box-shadow: var(--shadow);
+}
+.pozo .small { display: block; font-weight: 600; opacity: .85; margin-top: 2px; }
+.btn-share {
+  display: block; width: 100%; margin-top: 16px; padding: 13px 18px;
+  border: none; border-radius: 14px; cursor: pointer; font-weight: 900; font-size: 1rem;
+  background: #25d366; color: #073; box-shadow: var(--shadow); transition: transform .12s, filter .2s;
+}
+.btn-share:hover { transform: translateY(-2px); filter: brightness(1.03); }
+
 /* ============ Matches ============ */
 .matches { display: flex; flex-direction: column; gap: 12px; }
 .match {

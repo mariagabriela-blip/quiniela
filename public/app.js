@@ -280,7 +280,15 @@ function renderDeadlineBanner() {
     el.innerHTML = `🔒 <b>La quiniela está cerrada.</b> Cerró el ${fecha}. ¡Que ruede el balón! ⚽`;
   } else {
     el.className = "deadline open";
-    el.innerHTML = `⏰ Puedes editar tu quiniela hasta el <b>${fecha}</b> · cierra en <b>${countdownText()}</b>`;
+    const rec = myRecord();
+    let faltan = "";
+    if (rec) {
+      const n = (lastState.totalMatches || MATCHES.length) - rec.filled;
+      faltan = n > 0
+        ? ` · <b>te faltan ${n} partido${n === 1 ? "" : "s"}</b> por llenar ⚠️`
+        : " · ¡ya llenaste todo! ✅";
+    }
+    el.innerHTML = `⏰ Editas hasta el <b>${fecha}</b> · cierra en <b>${countdownText()}</b>${faltan}`;
   }
 }
 
@@ -340,7 +348,23 @@ $("#saveQuiniela").addEventListener("click", async () => {
 /* ============================================================
    TABLA EN VIVO — todos ven la quiniela de todos
    ============================================================ */
+function renderPozo() {
+  const el = $("#pozoBanner");
+  if (!el) return;
+  const players = lastState.players || [];
+  const total = players.length;
+  const pagaron = players.filter((p) => p.paid).length;
+  const cuota = typeof CUOTA === "number" ? CUOTA : 0;
+  const mon = typeof MONEDA === "string" ? MONEDA : "$";
+  const bote = pagaron * cuota;
+  if (!total) { el.className = "pozo"; el.innerHTML = ""; return; }
+  el.className = "pozo show";
+  el.innerHTML = `💰 <b>El Pozo: ${mon}${bote}</b> · pagaron ${pagaron} de ${total} ` +
+    `<span class="small">(cuota ${mon}${cuota} c/u) · ¡se lo lleva el 1er lugar! 🏆</span>`;
+}
+
 function renderLeaderboard() {
+  renderPozo();
   const lb = $("#leaderboard");
   const players = lastState.players;
   if (!players.length) {
@@ -389,6 +413,22 @@ function renderLeaderboard() {
     });
   });
 }
+
+/* ============================================================
+   COMPARTIR POR WHATSAPP
+   ============================================================ */
+function shareWhatsApp(text) {
+  const url = "https://wa.me/?text=" + encodeURIComponent(text);
+  window.open(url, "_blank");
+}
+$("#shareLb")?.addEventListener("click", () => {
+  const players = lastState.players || [];
+  const medals = ["🥇", "🥈", "🥉"];
+  const top = players.slice(0, 5)
+    .map((p, i) => `${medals[i] || (i + 1) + "."} ${p.name} — ${p.points} pts`).join("\n");
+  const txt = `🏆 *Quiniela del Mundial* 🏆\nTabla de posiciones:\n${top || "¡Aún sin jugadores!"}\n\n¡Entra y juega! ${location.href}`;
+  shareWhatsApp(txt);
+});
 
 /* ============================================================
    ADMIN
