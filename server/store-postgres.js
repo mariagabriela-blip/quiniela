@@ -14,6 +14,7 @@ const connectionString =
 const ssl = process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false };
 
 const pool = new Pool({ connectionString, ssl, max: 3 });
+pool.on("error", (e) => console.error("Postgres pool error:", e.message));
 
 const ready = pool.query(`
   CREATE TABLE IF NOT EXISTS players (
@@ -35,7 +36,10 @@ const ready = pool.query(`
     h        INTEGER,
     a        INTEGER
   );
-`);
+`).then(() => {});
+// Evita que un fallo de conexión al arrancar tumbe la función (unhandledRejection).
+// Quien haga `await store.ready` igual verá el error y responderá con un mensaje claro.
+ready.catch((e) => console.error("Error inicializando Postgres:", e.message));
 
 module.exports = {
   kind: "postgres",

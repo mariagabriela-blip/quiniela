@@ -51,9 +51,10 @@ async function api(path, opts = {}) {
   if (!res.ok) throw new Error((data && data.error) || "Error de red");
   return data;
 }
+let stateError = null;
 async function refreshState() {
-  try { lastState = await api("/api/state"); }
-  catch (e) { console.warn("Estado:", e.message); }
+  try { lastState = await api("/api/state"); stateError = null; }
+  catch (e) { stateError = e.message; console.warn("Estado:", e.message); }
   renderActivePanel();
 }
 function myRecord() {
@@ -432,6 +433,7 @@ tick();
 (async function init() {
   if (me) $("#playerName").value = me.name;
   await refreshState();
+  if (stateError) toast("⚠️ " + stateError);
   const rec = myRecord();
   if (rec && rec.fav) $("#favTeam").value = rec.fav;
   setInterval(() => { if (activeTab === "tabla") refreshState(); }, 8000);
