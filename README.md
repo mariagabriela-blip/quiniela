@@ -1,16 +1,17 @@
 # ⚽ La Quiniela del Mundial 🏆
 
-Una quiniela (pool de pronósticos) del Mundial de Fútbol, **100% web y sin servidor**.
-Los jugadores se registran con su nombre, cargan sus pronósticos y suben su comprobante
-de pago. Con banderas, animaciones, confeti, chistes y tabla de posiciones automática.
+Quiniela (pool de pronósticos) del Mundial de Fútbol con **backend compartido**:
+todos los jugadores escriben en la **misma base de datos**, así **todos ven la quiniela
+de todos** y la **tabla de posiciones en vivo** (quién va ganando, quién va perdiendo).
+Con banderas, animaciones, confeti, chistes y comprobante de pago.
 
 ## ✨ Qué hace
 
-- **Registro** con nombre, equipo del corazón ❤️ y **comprobante de pago** (imagen).
+- **Registro** con nombre, equipo del corazón ❤️ y **comprobante de pago** (imagen, se sube al servidor).
 - **Mi Quiniela**: pronostica los goles de cada partido (con banderas de cada selección).
-- **Reglas** de puntuación tal cual las pactó la directiva.
-- **Tabla de posiciones** que calcula los puntos automáticamente cuando el admin carga los resultados reales.
-- **Panel de Admin** (PIN) para cargar resultados reales y ver quién pagó.
+- **Tabla en vivo**: ranking con medallas 🥇🥈🥉, puntos automáticos y **se actualiza solo cada 8s**.
+  Toca cualquier jugador para **ver su quiniela completa** y los puntos partido por partido.
+- **Panel de Admin** (PIN) para cargar los **resultados reales** y revisar quién pagó (con link al comprobante).
 - **Interactividad**: confeti 🎉, banderas ondeando, chistes que rotan (clic = otro chiste).
 
 ## 🏅 Reglas de puntuación
@@ -23,33 +24,62 @@ de pago. Con banderas, animaciones, confeti, chistes y tabla de posiciones autom
 | Goles de uno pero **no** el resultado | **1** |
 | Nada de nada (un coño) | **0** |
 
-## 🚀 Cómo usarla
+## 🚀 Cómo correrlo
 
-No necesita instalación. Abre `index.html` en el navegador, o sírvela localmente:
+Requiere **Node.js 18+**.
 
 ```bash
-python3 -m http.server 8000
-# luego abre http://localhost:8000
+npm install
+npm start
+# abre http://localhost:3000
 ```
 
-Los datos se guardan en el **localStorage** del navegador (en ese mismo dispositivo).
+Variables de entorno opcionales:
+- `PORT` — puerto (por defecto `3000`).
+- `ADMIN_PIN` — PIN del panel de admin (por defecto `1234`). **Cámbialo** en producción:
+  ```bash
+  ADMIN_PIN=elquetuquieras PORT=8080 npm start
+  ```
 
-### PIN de Admin
-Por defecto es `1234`. Cámbialo en `app.js` (constante `ADMIN_PIN`).
+Los datos se guardan en `data/quiniela.db` (SQLite) y los comprobantes en `data/uploads/`.
+Esa carpeta está en `.gitignore` (no se sube al repo).
+
+## 🌐 Cómo lo usan todos
+
+1. Despliega el servidor en cualquier host (un VPS, Render, Railway, Fly.io, etc.).
+2. Comparte la URL por el grupo de WhatsApp.
+3. Cada quien entra, se registra, sube su comprobante y carga su quiniela.
+4. Todos ven la misma **Tabla** en vivo. El admin carga los resultados reales y los puntos se reparten solos.
+
+## 🧩 Arquitectura
+
+```
+public/           Frontend (se sirve estático)
+  index.html      Estructura y pestañas
+  styles.css      Estilos y animaciones
+  app.js          Lógica del cliente (habla con la API)
+shared-data.js    Equipos, partidos, chistes y la función de puntuación
+                  (la usan el navegador Y el servidor: una sola fuente de verdad)
+server/server.js  Backend Express + SQLite + subida de comprobantes
+data/             (generado) base de datos y comprobantes — ignorado por git
+```
+
+### API REST
+
+| Método | Ruta | Para qué |
+|---|---|---|
+| `GET`  | `/api/state` | Jugadores con pronósticos + puntos, y resultados. Ordenado por puntos. |
+| `POST` | `/api/register` | Registro/actualización (multipart: `name`, `fav`, `receipt`). |
+| `POST` | `/api/predictions` | Guarda los pronósticos del jugador (JSON). |
+| `POST` | `/api/admin/results` | (Admin) carga resultados reales. Header `x-admin-pin`. |
+| `POST` | `/api/admin/reset` | (Admin) borra todo. |
 
 ## 🛠️ Personalizar los partidos
 
-Edita `data.js`:
-- `TEAMS`: agrega o cambia selecciones y sus banderas (emoji).
-- `MATCHES`: define los partidos a pronosticar (`home`/`away` son claves de `TEAMS`).
-- `JOKES`: agrega tus propios chistes.
-
-## 📁 Archivos
-
-- `index.html` — estructura y pestañas.
-- `styles.css` — estilos y animaciones.
-- `data.js` — equipos, partidos y chistes (edítalo a gusto).
-- `app.js` — lógica: registro, pronósticos, puntuación, tabla, admin, confeti.
+Edita **`shared-data.js`**:
+- `TEAMS`: selecciones y sus banderas (emoji).
+- `MATCHES`: los partidos a pronosticar (`home`/`away` son claves de `TEAMS`).
+- `JOKES`: tus propios chistes.
 
 ---
 Hecho con ⚽, ☕ y mucha fe. ¡Suerte a todos! 🤞
