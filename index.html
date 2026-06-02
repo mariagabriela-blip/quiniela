@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>⚽ La Quiniela del Mundial 🏆</title>
+  <meta name="description" content="Quiniela del Mundial de Fútbol — registra tu nombre, carga tus pronósticos y tu comprobante de pago." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚽</text></svg>" />
+</head>
+<body>
+  <!-- Confetti + floating balls live here -->
+  <canvas id="confetti"></canvas>
+  <div class="pitch-bg" aria-hidden="true"></div>
+
+  <header class="hero">
+    <div class="hero-flags" id="heroFlags" aria-hidden="true"></div>
+    <h1 class="title">
+      <span class="ball">⚽</span>
+      La Quiniela del Mundial
+      <span class="cup">🏆</span>
+    </h1>
+    <p class="subtitle">Pronostica, paga, y reza. Que gane el mejor… o el más suertudo. 🍀</p>
+    <div class="joke" id="joke">Cargando chiste...</div>
+  </header>
+
+  <nav class="tabs" id="tabs">
+    <button class="tab active" data-tab="registro">📝 Registro</button>
+    <button class="tab" data-tab="quiniela">⚽ Mi Quiniela</button>
+    <button class="tab" data-tab="reglas">📖 Reglas</button>
+    <button class="tab" data-tab="tabla">🏅 Tabla</button>
+    <button class="tab" data-tab="admin">🔐 Admin</button>
+  </nav>
+
+  <main class="container">
+
+    <!-- ============ REGISTRO ============ -->
+    <section class="panel active" id="registro">
+      <h2>📝 Regístrate para jugar</h2>
+      <p class="muted">Pon tu nombre, sube tu comprobante de pago y entra a la guerra. 🔥</p>
+
+      <form id="registroForm" class="card">
+        <label>Tu nombre (o apodo de crack)
+          <input type="text" id="playerName" placeholder="Ej: Leonela 'La Pulga' Mavarez" required maxlength="40" />
+        </label>
+
+        <label>Equipo del corazón ❤️
+          <select id="favTeam"></select>
+        </label>
+
+        <label class="upload-label">Comprobante de pago 💸
+          <span class="muted small">Sin pago no hay quiniela, mi amor. Sube la captura.</span>
+          <input type="file" id="receipt" accept="image/*" />
+        </label>
+        <div id="receiptPreview" class="receipt-preview"></div>
+
+        <button type="submit" class="btn-primary">🚀 ¡Registrarme!</button>
+      </form>
+
+      <div id="currentPlayerBox" class="card hidden"></div>
+    </section>
+
+    <!-- ============ QUINIELA ============ -->
+    <section class="panel" id="quiniela">
+      <h2>⚽ Carga tu Quiniela</h2>
+      <p class="muted">Escribe los goles que crees que meterá cada equipo. ¡Sin miedo!</p>
+      <div id="needRegister" class="warn hidden">⚠️ Primero regístrate en la pestaña <b>Registro</b>.</div>
+      <div id="matchesList" class="matches"></div>
+      <button id="saveQuiniela" class="btn-primary hidden">💾 Guardar mi Quiniela</button>
+    </section>
+
+    <!-- ============ REGLAS ============ -->
+    <section class="panel" id="reglas">
+      <h2>📖 Las Normas Básicas</h2>
+      <div class="card rules">
+        <ul>
+          <li><span class="pts">5️⃣</span> Pega resultado y goles: <b>5 puntos</b></li>
+          <li><span class="pts">4️⃣</span> Pega resultado y goles de uno solo: <b>4 puntos</b></li>
+          <li><span class="pts">3️⃣</span> Pega solo el resultado: <b>3 puntos</b></li>
+          <li><span class="pts">1️⃣</span> Pega los goles de uno pero no el resultado: <b>1 punto</b></li>
+          <li><span class="pts">0️⃣</span> Y si no pega un coño… <b>un coño</b> 🫠</li>
+        </ul>
+        <p class="muted small">— Cortesía de la directiva. No se aceptan reclamos ni sobornos (bueno, sobornos sí). 😏</p>
+      </div>
+    </section>
+
+    <!-- ============ TABLA ============ -->
+    <section class="panel" id="tabla">
+      <h2>🏅 Tabla de Posiciones</h2>
+      <p class="muted">Los puntos se calculan cuando el Admin carga los resultados reales.</p>
+      <div id="leaderboard" class="leaderboard"></div>
+    </section>
+
+    <!-- ============ ADMIN ============ -->
+    <section class="panel" id="admin">
+      <h2>🔐 Panel del Admin</h2>
+      <p class="muted">Carga los resultados <b>reales</b> de cada partido para calcular los puntos.</p>
+      <div id="adminMatches" class="matches"></div>
+      <button id="saveResults" class="btn-primary">💾 Guardar resultados reales</button>
+      <hr/>
+      <h3>👥 Jugadores registrados</h3>
+      <div id="adminPlayers"></div>
+      <button id="resetAll" class="btn-danger">🗑️ Borrar TODO (cuidado)</button>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    Hecho con ⚽, ☕ y mucha fe. ¡Suerte a todos! 🤞
+  </footer>
+
+  <!-- Toast notifications -->
+  <div id="toast" class="toast"></div>
+
+  <script src="data.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
