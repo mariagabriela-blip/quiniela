@@ -192,16 +192,49 @@ function renderCurrentPlayer() {
   const rec = myRecord();
   if (!me || !rec) { box.classList.add("hidden"); setAuthForms(false); return; }
   setAuthForms(true);
-  const fav = rec.fav && TEAMS[rec.fav] ? `${TEAMS[rec.fav].flag} ${TEAMS[rec.fav].name}` : "—";
   const paid = rec.paid ? "✅ Comprobante cargado" : "❌ Falta el comprobante";
+  const opts = '<option value="">— elige tu equipo —</option>' +
+    Object.entries(TEAMS).map(([c, t]) =>
+      `<option value="${c}" ${c === rec.fav ? "selected" : ""}>${t.flag} ${t.name}</option>`).join("");
   box.classList.remove("hidden");
   box.innerHTML = `
     <h3>👤 Jugando como: ${rec.name}</h3>
-    <p>Equipo del corazón: <b>${fav}</b></p>
+    <p>Pronósticos: <b>${rec.filled}/${lastState.totalMatches}</b> · Puntos: <b>${rec.points} pts</b> 🏅</p>
     <p>Pago: <b>${paid}</b></p>
-    <p>Pronósticos cargados: <b>${rec.filled}/${lastState.totalMatches}</b></p>
-    <p>Puntos actuales: <b>${rec.points} pts</b> 🏅</p>
+    <label>Equipo del corazón ❤️
+      <select id="profFav">${opts}</select>
+    </label>
+    <label class="upload-label">${rec.paid ? "Reemplazar comprobante 💸" : "Subir comprobante de pago 💸"}
+      <span class="muted small">${rec.paid ? "Ya cargaste uno. Sube otro solo si quieres cambiarlo." : "¿No lo subiste al registrarte? Súbelo aquí."}</span>
+      <input type="file" id="profReceipt" accept="image/*" />
+    </label>
+    <div id="profReceiptPreview" class="receipt-preview"></div>
+    <button class="btn-primary" id="saveProfileBtn">💾 Guardar cambios</button>
     <button class="btn-danger" id="logoutBtn">Cambiar de jugador</button>`;
+
+  $("#profReceipt").addEventListener("change", async (e) => {
+    const f = e.target.files[0];
+    if (!f) { $("#profReceiptPreview").innerHTML = ""; return; }
+    const url = await readFileAsDataURL(f);
+    $("#profReceiptPreview").innerHTML = `<img src="${url}" alt="comprobante" />`;
+  });
+
+  $("#saveProfileBtn").addEventListener("click", async () => {
+    const body = { name: me.name, pin: me.pin, fav: $("#profFav").value };
+    const f = $("#profReceipt").files[0];
+    if (f) body.receipt = await readFileAsDataURL(f);
+    try {
+      await api("/api/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      fireConfetti();
+      toast(f ? "¡Comprobante subido! 💸✅" : "¡Datos actualizados! 🎉");
+      await refreshState();
+    } catch (err) { toast("⚠️ " + err.message); }
+  });
+
   $("#logoutBtn").addEventListener("click", () => {
     clearMe();
     $("#playerName").value = ""; $("#playerPin").value = ""; $("#favTeam").value = "";
