@@ -28,6 +28,7 @@ if (usePostgres) {
     ready,
     allPlayers: fail, getPlayer: fail, savePlayer: fail,
     allMatches: fail, insertMatch: fail, deleteMatch: fail,
+    updateMatchTeams: fail, setMatchWinner: fail, setMatchDeadline: fail,
     allPredictions: fail, upsertPrediction: fail, deletePrediction: fail,
     allResults: fail, upsertResult: fail, deleteResult: fail, reset: fail,
   };

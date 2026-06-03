@@ -30,7 +30,9 @@ db.exec(`
     home     TEXT,
     away     TEXT,
     deadline TEXT,
-    ord      INTEGER
+    ord      INTEGER,
+    slot     INTEGER,
+    winner   TEXT
   );
   CREATE TABLE IF NOT EXISTS predictions (
     player_name TEXT,
@@ -46,11 +48,16 @@ db.exec(`
   );
 `);
 
+// Migración: agrega columnas nuevas si la tabla ya existía sin ellas.
+const cols = db.prepare("PRAGMA table_info(matches)").all().map((c) => c.name);
+if (!cols.includes("slot")) db.exec("ALTER TABLE matches ADD COLUMN slot INTEGER");
+if (!cols.includes("winner")) db.exec("ALTER TABLE matches ADD COLUMN winner TEXT");
+
 // Siembra los partidos de la fase de grupos la primera vez.
 const matchCount = db.prepare("SELECT COUNT(*) AS n FROM matches").get().n;
 if (matchCount === 0) {
   const ins = db.prepare(
-    "INSERT INTO matches (id, round, grp, home, away, deadline, ord) VALUES (?, ?, ?, ?, ?, ?, ?)"
+    "INSERT INTO matches (id, round, grp, home, away, deadline, ord, slot, winner) VALUES (?, ?, ?, ?, ?, ?, ?, NULL, NULL)"
   );
   db.transaction(() => {
     MATCHES.forEach((m, i) => ins.run(m.id, "Grupos", m.group, m.home, m.away, DEADLINE, i));
@@ -80,8 +87,17 @@ module.exports = {
   },
   async insertMatch(m) {
     db.prepare(
-      "INSERT INTO matches (id, round, grp, home, away, deadline, ord) VALUES (@id, @round, @grp, @home, @away, @deadline, @ord)"
-    ).run(m);
+      "INSERT INTO matches (id, round, grp, home, away, deadline, ord, slot, winner) VALUES (@id, @round, @grp, @home, @away, @deadline, @ord, @slot, @winner)"
+    ).run({ slot: null, winner: null, grp: null, deadline: null, ...m });
+  },
+  async updateMatchTeams(id, home, away) {
+    db.prepare("UPDATE matches SET home=?, away=?, winner=NULL WHERE id=?").run(home, away, id);
+  },
+  async setMatchWinner(id, winner) {
+    db.prepare("UPDATE matches SET winner=? WHERE id=?").run(winner, id);
+  },
+  async setMatchDeadline(id, deadline) {
+    db.prepare("UPDATE matches SET deadline=? WHERE id=?").run(deadline, id);
   },
   async deleteMatch(id) {
     db.transaction(() => {

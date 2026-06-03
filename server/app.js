@@ -26,12 +26,24 @@ const clampScore = (v) => {
   if (n > 30) n = 30;
   return n;
 };
-const matchDeadline = (m) => (m && m.deadline) || DEADLINE_ISO;
+// Cierre por partido:
+//  - Grupos: usa su fecha (o el cierre global por defecto).
+//  - Eliminatorias: si no tienen fecha asignada, están ABIERTAS (el admin la pone luego).
+function matchDeadline(m) {
+  if (!m) return null;
+  if (m.round === "Grupos") return m.deadline || DEADLINE_ISO;
+  return m.deadline || null;
+}
 function matchLocked(m) {
-  const ms = Date.parse(matchDeadline(m));
+  const dl = matchDeadline(m);
+  if (!dl) return false; // sin fecha => abierto
+  const ms = Date.parse(dl);
   return Number.isFinite(ms) && Date.now() >= ms;
 }
 const hasBoth = (v) => v && v.h !== "" && v.h != null && v.a !== "" && v.a != null;
+
+// Rondas de eliminatoria en orden (cada una alimenta a la siguiente).
+const KO_ORDER = ["Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final"];
 
 const app = express();
 app.use(express.json({ limit: "8mb" }));
@@ -90,6 +102,7 @@ app.get("/api/state", async (_req, res, next) => {
     const matchesOut = matches.map((m) => ({
       id: m.id, round: m.round, group: m.grp, home: m.home, away: m.away,
       deadline: matchDeadline(m), locked: matchLocked(m),
+      slot: m.slot ?? null, winner: m.winner ?? null,
     }));
 
     res.json({
@@ -189,13 +202,75 @@ app.get("/api/admin/players", requireAdmin, async (_req, res, next) => {
 app.post("/api/admin/results", requireAdmin, async (req, res, next) => {
   try {
     const matches = await store.allMatches();
-    const valid = new Set(matches.map((m) => m.id));
+    const byId = Object.fromEntries(matches.map((m) => [m.id, m]));
     for (const [mid, val] of Object.entries(req.body.results || {})) {
-      if (!valid.has(mid)) continue;
-      if (hasBoth(val)) await store.upsertResult(mid, clampScore(val.h), clampScore(val.a));
-      else await store.deleteResult(mid);
+      const m = byId[mid];
+      if (!m) continue;
+      if (hasBoth(val)) {
+        const h = clampScore(val.h), a = clampScore(val.a);
+        await store.upsertResult(mid, h, a);
+        if (m.round !== "Grupos") {
+          // Quién avanzó: lo que diga el admin (penales), o el ganador por marcador.
+          let winner = (val.winner === m.home || val.winner === m.away) ? val.winner : null;
+          if (!winner) winner = h > a ? m.home : a > h ? m.away : null;
+          await store.setMatchWinner(mid, winner);
+        }
+      } else {
+        await store.deleteResult(mid);
+        if (m.round !== "Grupos") await store.setMatchWinner(mid, null);
+      }
     }
+    await advanceBracket();
     res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// Crea automáticamente la siguiente ronda cuando la anterior está decidida.
+async function advanceBracket() {
+  const results = {};
+  for (const r of await store.allResults()) results[r.match_id] = true;
+  let matches = await store.allMatches();
+  const ofRound = (r) => matches.filter((m) => m.round === r).sort((a, b) => (a.slot || 0) - (b.slot || 0));
+  let maxOrd = matches.reduce((mx, m) => Math.max(mx, m.ord || 0), 0);
+  const newId = () => "k_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+
+  const ensurePair = async (round, slot, home, away) => {
+    const exist = matches.find((m) => m.round === round && (m.slot || 0) === slot);
+    if (!exist) {
+      await store.insertMatch({ id: newId(), round, grp: null, home, away, deadline: null, ord: ++maxOrd, slot, winner: null });
+    } else if (!results[exist.id] && (exist.home !== home || exist.away !== away)) {
+      await store.updateMatchTeams(exist.id, home, away); // corrige si cambió un ganador
+    }
+  };
+
+  for (let i = 0; i < KO_ORDER.length - 1; i++) {
+    const src = ofRound(KO_ORDER[i]);
+    if (!src.length || !src.every((m) => m.winner)) continue;
+    const next = KO_ORDER[i + 1];
+    for (let k = 0; k < Math.floor(src.length / 2); k++) {
+      await ensurePair(next, k + 1, src[2 * k].winner, src[2 * k + 1].winner);
+    }
+    matches = await store.allMatches(); // refresca para la siguiente vuelta
+  }
+
+  // Tercer puesto: los perdedores de las dos semifinales.
+  const semis = ofRound("Semifinal");
+  if (semis.length === 2 && semis.every((m) => m.winner)) {
+    const loser = (m) => (m.home === m.winner ? m.away : m.home);
+    await ensurePair("3er puesto", 1, loser(semis[0]), loser(semis[1]));
+  }
+}
+
+// (Admin) poner un mismo cierre a todos los partidos de una ronda
+app.post("/api/admin/round-deadline", requireAdmin, async (req, res, next) => {
+  try {
+    const round = (req.body.round || "").trim();
+    const dl = (req.body.deadline || "").trim() || null;
+    if (!round) return res.status(400).json({ error: "Falta la ronda" });
+    if (dl && isNaN(Date.parse(dl))) return res.status(400).json({ error: "Fecha inválida" });
+    const matches = (await store.allMatches()).filter((m) => m.round === round);
+    for (const m of matches) await store.setMatchDeadline(m.id, dl);
+    res.json({ ok: true, count: matches.length });
   } catch (e) { next(e); }
 });
 
@@ -214,9 +289,10 @@ app.post("/api/admin/match", requireAdmin, async (req, res, next) => {
 
     const matches = await store.allMatches();
     const ord = matches.reduce((mx, m) => Math.max(mx, m.ord || 0), 0) + 1;
+    const slot = matches.filter((m) => m.round === round).length + 1; // posición en el bracket
     const id = "k_" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-    await store.insertMatch({ id, round, grp, home, away, deadline, ord });
-    res.json({ ok: true, id });
+    await store.insertMatch({ id, round, grp, home, away, deadline, ord, slot, winner: null });
+    res.json({ ok: true, id, slot });
   } catch (e) { next(e); }
 });
 

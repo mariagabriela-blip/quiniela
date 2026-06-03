@@ -329,7 +329,7 @@ function renderQuiniela() {
     const items = r.items.map((m) => {
       const p = preds[m.id] || {};
       const dis = m.locked ? "disabled" : "";
-      const sub = m.group ? `Grupo ${m.group}` : r.round;
+      const sub = m.group ? `Grupo ${m.group}` : `${r.round}${m.slot ? " #" + m.slot : ""}`;
       const lock = m.locked ? ' <span class="lockt">🔒 cerrado</span>' : "";
       return `<div class="match${m.locked ? " mlocked" : ""}">
         <div class="grp">${sub}${lock}</div>
@@ -477,7 +477,16 @@ async function renderAdmin() {
     const header = `<div class="round-head">${roundLabel(r.round)}</div>`;
     const items = r.items.map((m) => {
       const rr = lastState.results[m.id] || {};
-      const sub = m.group ? `Grupo ${m.group}` : r.round;
+      const sub = m.group ? `Grupo ${m.group}` : `${r.round}${m.slot ? " #" + m.slot : ""}`;
+      const koSel = m.round !== "Grupos"
+        ? `<div class="winrow">🏃 Avanzó:
+             <select class="winsel" data-mid="${m.id}">
+               <option value="">— auto por marcador —</option>
+               <option value="${m.home}" ${m.winner === m.home ? "selected" : ""}>${teamFlag(m.home)} ${TEAMS[m.home]?.name || m.home}</option>
+               <option value="${m.away}" ${m.winner === m.away ? "selected" : ""}>${teamFlag(m.away)} ${TEAMS[m.away]?.name || m.away}</option>
+             </select> <span class="muted small">(elige aquí si hubo penales)</span>
+           </div>`
+        : "";
       return `<div class="match">
         <div class="grp">${sub}</div>
         ${teamHTML(m.home)}
@@ -487,7 +496,7 @@ async function renderAdmin() {
           <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="a" value="${rr.a ?? ""}" />
         </div>
         ${teamHTML(m.away)}
-      </div>`;
+      </div>${koSel}`;
     }).join("");
     return header + items;
   }).join("");
@@ -522,6 +531,10 @@ function renderAddMatch() {
   $("#amRound").innerHTML = rounds.map((r) => `<option value="${r}">${r}</option>`).join("");
   $("#amHome").innerHTML = teamOptions();
   $("#amAway").innerHTML = teamOptions();
+
+  // Selector de "cierre por ronda"
+  const present = [...new Set(getMatches().map((m) => m.round))];
+  if ($("#rdRound")) $("#rdRound").innerHTML = present.map((r) => `<option value="${r}">${roundLabel(r)}</option>`).join("");
 
   const kos = getMatches().filter((m) => m.round !== "Grupos");
   const box = $("#adminKnockouts");
@@ -569,12 +582,32 @@ $("#addMatchBtn")?.addEventListener("click", async () => {
   } catch (e) { toast("⚠️ " + e.message); }
 });
 
+$("#rdApply")?.addEventListener("click", async () => {
+  if (!adminPin) return promptAdmin();
+  const round = $("#rdRound").value;
+  const dlLocal = $("#rdDeadline").value;
+  let deadline = null;
+  if (dlLocal) { const d = new Date(dlLocal); if (!isNaN(d)) deadline = d.toISOString(); }
+  try {
+    const r = await api("/api/admin/round-deadline", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-pin": adminPin },
+      body: JSON.stringify({ round, deadline }),
+    });
+    toast(`Cierre aplicado a ${r.count} partido(s) ⏲️`);
+    await refreshState();
+  } catch (e) { toast("⚠️ " + e.message); }
+});
+
 $("#saveResults").addEventListener("click", async () => {
   if (!adminPin) return promptAdmin();
   const results = {};
   $$("#adminMatches .score-in").forEach((inp) => {
     const mid = inp.dataset.mid, side = inp.dataset.side;
     (results[mid] ||= {})[side] = inp.value === "" ? null : clampScore(inp.value);
+  });
+  $$("#adminMatches .winsel").forEach((sel) => {
+    if (sel.value) (results[sel.dataset.mid] ||= {}).winner = sel.value;
   });
   try {
     await api("/api/admin/results", {

@@ -128,8 +128,8 @@
       <button id="saveResults" class="btn-primary">💾 Guardar resultados reales</button>
 
       <hr/>
-      <h3>➕ Agregar partido (eliminatorias)</h3>
-      <p class="muted small">Cuando se sepan los equipos de octavos, cuartos, etc., agrégalos aquí. Cada partido cierra en la fecha/hora que pongas (hora de tu teléfono).</p>
+      <h3>➕ Armar Dieciseisavos (1ª ronda)</h3>
+      <p class="muted small">Cuando terminen los grupos, agrega aquí los 16 partidos de Dieciseisavos en orden de bracket. <b>Las siguientes rondas (Octavos, Cuartos, Semis, Final, 3er puesto) se crean SOLAS</b> con los ganadores cuando cargues los resultados. 🤖</p>
       <form id="addMatchCard" class="card" onsubmit="return false">
         <label>Ronda
           <select id="amRound"></select>
@@ -146,6 +146,19 @@
         <button id="addMatchBtn" class="btn-primary" type="button">➕ Agregar partido</button>
       </form>
       <div id="adminKnockouts"></div>
+
+      <hr/>
+      <h3>⏲️ Cierre por ronda</h3>
+      <p class="muted small">Pon una misma fecha/hora de cierre a todos los partidos de una ronda (p. ej. cuando empieza esa fase).</p>
+      <form id="roundDlCard" class="card" onsubmit="return false">
+        <label>Ronda
+          <select id="rdRound"></select>
+        </label>
+        <label>Cierra (fecha y hora)
+          <input type="datetime-local" id="rdDeadline" />
+        </label>
+        <button id="rdApply" class="btn-primary" type="button">⏲️ Aplicar cierre a la ronda</button>
+      </form>
 
       <hr/>
       <h3>👥 Jugadores registrados</h3>

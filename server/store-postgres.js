@@ -33,7 +33,9 @@ const ready = (async () => {
       home     TEXT,
       away     TEXT,
       deadline TEXT,
-      ord      INTEGER
+      ord      INTEGER,
+      slot     INTEGER,
+      winner   TEXT
     );
     CREATE TABLE IF NOT EXISTS predictions (
       player_name TEXT,
@@ -48,6 +50,10 @@ const ready = (async () => {
       a        INTEGER
     );
   `);
+  // Migración: agrega columnas nuevas si la tabla ya existía sin ellas.
+  await pool.query("ALTER TABLE matches ADD COLUMN IF NOT EXISTS slot INTEGER");
+  await pool.query("ALTER TABLE matches ADD COLUMN IF NOT EXISTS winner TEXT");
+
   // Siembra los partidos de la fase de grupos la primera vez.
   const { rows } = await pool.query("SELECT COUNT(*)::int AS n FROM matches");
   if (rows[0].n === 0) {
@@ -98,9 +104,18 @@ module.exports = {
   },
   async insertMatch(m) {
     await pool.query(
-      "INSERT INTO matches (id, round, grp, home, away, deadline, ord) VALUES ($1,$2,$3,$4,$5,$6,$7)",
-      [m.id, m.round, m.grp, m.home, m.away, m.deadline, m.ord]
+      "INSERT INTO matches (id, round, grp, home, away, deadline, ord, slot, winner) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)",
+      [m.id, m.round, m.grp ?? null, m.home, m.away, m.deadline ?? null, m.ord, m.slot ?? null, m.winner ?? null]
     );
+  },
+  async updateMatchTeams(id, home, away) {
+    await pool.query("UPDATE matches SET home=$1, away=$2, winner=NULL WHERE id=$3", [home, away, id]);
+  },
+  async setMatchWinner(id, winner) {
+    await pool.query("UPDATE matches SET winner=$1 WHERE id=$2", [winner, id]);
+  },
+  async setMatchDeadline(id, deadline) {
+    await pool.query("UPDATE matches SET deadline=$1 WHERE id=$2", [deadline, id]);
   },
   async deleteMatch(id) {
     const client = await pool.connect();
