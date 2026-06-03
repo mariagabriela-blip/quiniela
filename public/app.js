@@ -92,6 +92,7 @@ $$(".tab").forEach((tab) => {
 function renderActivePanel() {
   if (activeTab === "registro") renderCurrentPlayer();
   if (activeTab === "quiniela") renderQuiniela();
+  if (activeTab === "extras") renderExtras();
   if (activeTab === "tabla") renderLeaderboard();
   if (activeTab === "admin") renderAdmin();
 }
@@ -376,6 +377,87 @@ $("#saveQuiniela").addEventListener("click", async () => {
 });
 
 /* ============================================================
+   EXTRAS: predicciones bonus + comodín
+   ============================================================ */
+function teamSelect(id, sel) {
+  return `<select id="${id}">` +
+    '<option value="">— elige —</option>' +
+    Object.entries(TEAMS).map(([c, t]) => `<option value="${c}" ${c === sel ? "selected" : ""}>${t.flag} ${t.name}</option>`).join("") +
+    "</select>";
+}
+function renderExtras() {
+  const body = $("#extrasBody");
+  const rec = myRecord();
+  if (!me || !rec) {
+    body.innerHTML = `<div class="warn">⚠️ Para tus extras, primero <b>entra con tu nombre y PIN</b>.
+      <button class="btn-primary" id="goLogin2">🔓 Ir a Entrar / Registro</button></div>`;
+    $("#goLogin2").addEventListener("click", () => { document.querySelector('.tab[data-tab="registro"]').click(); $("#loginName")?.focus(); });
+    return;
+  }
+  const b = rec.bonus || {};
+  const bp = lastState.bonusPts || (typeof BONUS !== "undefined" ? BONUS : { champ: 0, runnerup: 0, scorer: 0, surprise: 0 });
+  const gLocked = !!lastState.globalLocked;
+  const dis = gLocked ? "disabled" : "";
+
+  // Comodín: opciones de partidos (deshabilita los cerrados)
+  const jokerOpts = '<option value="">— sin comodín —</option>' +
+    matchesByRound().map((r) => r.items.map((m) => {
+      const lbl = `${roundLabel(r.round).replace(/^[^ ]+ /, "")}: ${teamFlag(m.home)} ${TEAMS[m.home]?.name || m.home} vs ${teamFlag(m.away)} ${TEAMS[m.away]?.name || m.away}`;
+      const d = m.locked && m.id !== rec.joker ? "disabled" : "";
+      return `<option value="${m.id}" ${m.id === rec.joker ? "selected" : ""} ${d}>${m.locked ? "🔒 " : ""}${lbl}</option>`;
+    }).join("")).join("");
+
+  body.innerHTML = `
+    <form id="bonusCard" class="card" onsubmit="return false">
+      <h3>🏆 Predicciones del torneo</h3>
+      <p class="muted small">${gLocked ? "🔒 Ya cerraron (arrancó el Mundial)." : "Editables hasta que arranque el Mundial."} Puntos: campeón +${bp.champ}, subcampeón +${bp.runnerup}, goleador +${bp.scorer}, sorpresa +${bp.surprise}.</p>
+      <label>🏆 Campeón ${teamSelect("xChamp", b.champ)}</label>
+      <label>🥈 Subcampeón ${teamSelect("xRunner", b.runnerup)}</label>
+      <label>👟 Goleador (nombre)
+        <input type="text" id="xScorer" maxlength="40" placeholder="Ej: Mbappé" value="${b.scorer ? b.scorer.replace(/"/g, "&quot;") : ""}" />
+      </label>
+      <label>😮 Sorpresa del Mundial ${teamSelect("xSurprise", b.surprise)}</label>
+      <button class="btn-primary" id="saveBonus" type="button" ${dis}>💾 Guardar predicciones</button>
+    </form>
+
+    <form id="jokerCard" class="card" onsubmit="return false">
+      <h3>✨ Comodín (puntos dobles)</h3>
+      <p class="muted small">Elige <b>un partido abierto</b>: sus puntos cuentan <b>doble</b>. Puedes cambiarlo mientras ese partido no haya cerrado.</p>
+      <label>Partido con doble puntos
+        <select id="xJoker">${jokerOpts}</select>
+      </label>
+      <button class="btn-primary" id="saveJoker" type="button">✨ Guardar comodín</button>
+    </form>`;
+
+  if (!gLocked) {
+    $("#saveBonus").addEventListener("click", async () => {
+      try {
+        await api("/api/bonus", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: me.name, pin: me.pin,
+            champ: $("#xChamp").value, runnerup: $("#xRunner").value,
+            surprise: $("#xSurprise").value, scorer: $("#xScorer").value,
+          }),
+        });
+        fireConfetti(); toast("¡Predicciones bonus guardadas! 🏆");
+        await refreshState();
+      } catch (e) { toast("⚠️ " + e.message); }
+    });
+  }
+  $("#saveJoker").addEventListener("click", async () => {
+    try {
+      await api("/api/joker", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: me.name, pin: me.pin, matchId: $("#xJoker").value }),
+      });
+      fireConfetti(); toast("¡Comodín guardado! ✨");
+      await refreshState();
+    } catch (e) { toast("⚠️ " + e.message); }
+  });
+}
+
+/* ============================================================
    TABLA EN VIVO — todos ven la quiniela de todos
    ============================================================ */
 function renderPozo() {
@@ -426,14 +508,19 @@ function renderLeaderboard() {
       $$(".lb-detail").forEach((d) => d.classList.add("hidden"));
       if (open) return;
       const p = players[i];
-      det.innerHTML = getMatches().map((m) => {
+      const bd = p.breakdown || { match: 0, joker: 0, bonus: 0 };
+      const jm = p.joker ? getMatches().find((m) => m.id === p.joker) : null;
+      const jtxt = jm ? `${teamFlag(jm.home)} vs ${teamFlag(jm.away)}` : "—";
+      const head = `<div class="det-sum">⚽ Partidos <b>${bd.match}</b> · ✨ Comodín <b>+${bd.joker}</b> (${jtxt}) · 🏆 Bonus <b>+${bd.bonus}</b></div>`;
+      det.innerHTML = head + getMatches().map((m) => {
         const pr = p.predictions[m.id];
         const rr = lastState.results[m.id];
         const guess = pr ? `${pr.h}-${pr.a}` : "—";
         const real = rr ? `${rr.h}-${rr.a}` : "·";
         const pts = anyResults ? `<b>+${p.perMatch[m.id] || 0}</b>` : "";
+        const jk = m.id === p.joker ? "✨ " : "";
         return `<div class="det-row">
-          <span>${teamFlag(m.home)} vs ${teamFlag(m.away)}</span>
+          <span>${jk}${teamFlag(m.home)} vs ${teamFlag(m.away)}</span>
           <span class="g">tú: ${guess}</span>
           <span class="r">real: ${real}</span>
           <span class="pp">${pts}</span>
@@ -501,6 +588,7 @@ async function renderAdmin() {
   }).join("");
 
   renderAddMatch();
+  renderAdminBonus();
 
   // jugadores + comprobantes (solo admin)
   const pa = $("#adminPlayers");
@@ -577,6 +665,30 @@ $("#addMatchBtn")?.addEventListener("click", async () => {
     fireConfetti();
     toast("¡Partido agregado! ⚽");
     $("#amHome").value = ""; $("#amAway").value = ""; $("#amDeadline").value = "";
+    await refreshState();
+  } catch (e) { toast("⚠️ " + e.message); }
+});
+
+function renderAdminBonus() {
+  const a = lastState.bonusAnswers || {};
+  if ($("#abChamp")) $("#abChamp").innerHTML = teamOptions(a.champ);
+  if ($("#abRunner")) $("#abRunner").innerHTML = teamOptions(a.runnerup);
+  if ($("#abSurprise")) $("#abSurprise").innerHTML = teamOptions(a.surprise);
+  if ($("#abScorer")) $("#abScorer").value = a.scorer || "";
+}
+$("#saveBonusAns")?.addEventListener("click", async () => {
+  if (!adminPin) return promptAdmin();
+  try {
+    await api("/api/admin/bonus", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "x-admin-pin": adminPin },
+      body: JSON.stringify({
+        champ: $("#abChamp").value, runnerup: $("#abRunner").value,
+        surprise: $("#abSurprise").value, scorer: $("#abScorer").value,
+      }),
+    });
+    fireConfetti();
+    toast("Respuestas del bonus guardadas 🏆");
     await refreshState();
   } catch (e) { toast("⚠️ " + e.message); }
 });

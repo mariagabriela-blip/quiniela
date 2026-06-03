@@ -235,6 +235,7 @@ input[type=file] { font-size: .9rem; padding: 8px 0; }
   font-size: .85rem; padding: 5px 0; border-bottom: 1px dashed #e0e6da; align-items: center;
 }
 .det-row:last-child { border-bottom: none; }
+.det-sum { font-size: .82rem; background: #eef4ea; border-radius: 8px; padding: 7px 10px; margin-bottom: 8px; font-weight: 600; color: #2a4020; }
 .det-row .g { color: #0c5e8f; font-weight: 700; }
 .det-row .r { color: var(--red); font-weight: 700; }
 .det-row .pp { text-align: right; color: var(--green-dark); }

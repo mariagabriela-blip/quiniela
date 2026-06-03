@@ -53,6 +53,13 @@ const cols = db.prepare("PRAGMA table_info(matches)").all().map((c) => c.name);
 if (!cols.includes("slot")) db.exec("ALTER TABLE matches ADD COLUMN slot INTEGER");
 if (!cols.includes("winner")) db.exec("ALTER TABLE matches ADD COLUMN winner TEXT");
 
+// Bonus/comodín por jugador + tabla de ajustes (respuestas oficiales).
+const pcols = db.prepare("PRAGMA table_info(players)").all().map((c) => c.name);
+for (const col of ["champ", "runnerup", "scorer", "surprise", "joker"]) {
+  if (!pcols.includes(col)) db.exec(`ALTER TABLE players ADD COLUMN ${col} TEXT`);
+}
+db.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)");
+
 // Siembra los partidos de la fase de grupos la primera vez.
 const matchCount = db.prepare("SELECT COUNT(*) AS n FROM matches").get().n;
 if (matchCount === 0) {
@@ -133,8 +140,25 @@ module.exports = {
     db.prepare("DELETE FROM results WHERE match_id = ?").run(matchId);
   },
 
+  async setBonus(name, b) {
+    db.prepare("UPDATE players SET champ=?, runnerup=?, scorer=?, surprise=? WHERE name=?")
+      .run(b.champ ?? null, b.runnerup ?? null, b.scorer ?? null, b.surprise ?? null, name);
+  },
+  async setJoker(name, joker) {
+    db.prepare("UPDATE players SET joker=? WHERE name=?").run(joker ?? null, name);
+  },
+  async getSettings() {
+    const o = {};
+    for (const r of db.prepare("SELECT * FROM settings").all()) o[r.key] = r.value;
+    return o;
+  },
+  async setSettings(obj) {
+    const up = db.prepare("INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value");
+    db.transaction(() => { for (const [k, v] of Object.entries(obj)) up.run(k, v ?? null); })();
+  },
+
   async reset() {
-    // Borra jugadores, pronósticos y resultados. Conserva el fixture (matches).
+    // Borra jugadores, pronósticos y resultados. Conserva el fixture (matches) y los ajustes.
     db.exec("DELETE FROM predictions; DELETE FROM results; DELETE FROM players;");
   },
 };

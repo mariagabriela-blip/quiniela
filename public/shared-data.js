@@ -19,6 +19,7 @@
     root.DEADLINE = data.DEADLINE;
     root.CUOTA = data.CUOTA;
     root.MONEDA = data.MONEDA;
+    root.BONUS = data.BONUS;
   }
 })(typeof self !== "undefined" ? self : this, function () {
 
@@ -35,6 +36,11 @@
      automáticamente: (jugadores que pagaron) x CUOTA. 👉 Cámbialo a tu gusto. */
   const CUOTA = 10;
   const MONEDA = "$";
+
+  /* ---------- Puntos extra (bonus) ----------
+     Aciertos del torneo completo (se pronostican antes de que arranque).
+     👉 Cambia los valores a tu gusto. */
+  const BONUS = { champ: 10, runnerup: 6, scorer: 8, surprise: 5 };
 
   /* ---------- Equipos (sorteo final del 5 de diciembre de 2025) ---------- */
   const TEAMS = {
@@ -160,5 +166,5 @@
     return 0;
   }
 
-  return { TEAMS, MATCHES, JOKES, scoreMatch, DEADLINE, CUOTA, MONEDA };
+  return { TEAMS, MATCHES, JOKES, scoreMatch, DEADLINE, CUOTA, MONEDA, BONUS };
 });

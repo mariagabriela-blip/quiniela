@@ -30,7 +30,8 @@ if (usePostgres) {
     allMatches: fail, insertMatch: fail, deleteMatch: fail,
     updateMatchTeams: fail, setMatchWinner: fail, setMatchDeadline: fail,
     allPredictions: fail, upsertPrediction: fail, deletePrediction: fail,
-    allResults: fail, upsertResult: fail, deleteResult: fail, reset: fail,
+    allResults: fail, upsertResult: fail, deleteResult: fail,
+    setBonus: fail, setJoker: fail, getSettings: fail, setSettings: fail, reset: fail,
   };
 } else {
   module.exports = require("./store-sqlite");

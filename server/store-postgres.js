@@ -53,6 +53,10 @@ const ready = (async () => {
   // Migración: agrega columnas nuevas si la tabla ya existía sin ellas.
   await pool.query("ALTER TABLE matches ADD COLUMN IF NOT EXISTS slot INTEGER");
   await pool.query("ALTER TABLE matches ADD COLUMN IF NOT EXISTS winner TEXT");
+  for (const col of ["champ", "runnerup", "scorer", "surprise", "joker"]) {
+    await pool.query(`ALTER TABLE players ADD COLUMN IF NOT EXISTS ${col} TEXT`);
+  }
+  await pool.query("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)");
 
   // Siembra los partidos de la fase de grupos la primera vez.
   const { rows } = await pool.query("SELECT COUNT(*)::int AS n FROM matches");
@@ -162,8 +166,32 @@ module.exports = {
     await pool.query("DELETE FROM results WHERE match_id = $1", [matchId]);
   },
 
+  async setBonus(name, b) {
+    await pool.query(
+      "UPDATE players SET champ=$1, runnerup=$2, scorer=$3, surprise=$4 WHERE name=$5",
+      [b.champ ?? null, b.runnerup ?? null, b.scorer ?? null, b.surprise ?? null, name]
+    );
+  },
+  async setJoker(name, joker) {
+    await pool.query("UPDATE players SET joker=$1 WHERE name=$2", [joker ?? null, name]);
+  },
+  async getSettings() {
+    const { rows } = await pool.query("SELECT * FROM settings");
+    const o = {};
+    for (const r of rows) o[r.key] = r.value;
+    return o;
+  },
+  async setSettings(obj) {
+    for (const [k, v] of Object.entries(obj)) {
+      await pool.query(
+        "INSERT INTO settings (key, value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=$2",
+        [k, v ?? null]
+      );
+    }
+  },
+
   async reset() {
-    // Borra jugadores, pronósticos y resultados. Conserva el fixture (matches).
+    // Borra jugadores, pronósticos y resultados. Conserva el fixture (matches) y los ajustes.
     await pool.query("DELETE FROM predictions");
     await pool.query("DELETE FROM results");
     await pool.query("DELETE FROM players");

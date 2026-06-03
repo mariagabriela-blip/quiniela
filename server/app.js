@@ -11,7 +11,7 @@ const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
 
-const { TEAMS, scoreMatch, DEADLINE } = require("../public/shared-data.js");
+const { TEAMS, scoreMatch, DEADLINE, BONUS } = require("../public/shared-data.js");
 const store = require("./store.js");
 
 const ADMIN_PIN = process.env.ADMIN_PIN || "1234";
@@ -45,6 +45,22 @@ const hasBoth = (v) => v && v.h !== "" && v.h != null && v.a !== "" && v.a != nu
 // Rondas de eliminatoria en orden (cada una alimenta a la siguiente).
 const KO_ORDER = ["Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final"];
 
+// El cierre global (arranque del Mundial) bloquea las predicciones bonus.
+function globalLocked() {
+  const ms = Date.parse(DEADLINE_ISO);
+  return Number.isFinite(ms) && Date.now() >= ms;
+}
+function bonusPoints(pl, ans) {
+  let p = 0;
+  const eq = (a, b) => a && b && a === b;
+  const eqTxt = (a, b) => a && b && a.trim().toLowerCase() === b.trim().toLowerCase();
+  if (eq(pl.champ, ans.champ)) p += BONUS.champ;
+  if (eq(pl.runnerup, ans.runnerup)) p += BONUS.runnerup;
+  if (eqTxt(pl.scorer, ans.scorer)) p += BONUS.scorer;
+  if (eq(pl.surprise, ans.surprise)) p += BONUS.surprise;
+  return p;
+}
+
 const app = express();
 app.use(express.json({ limit: "8mb" }));
 
@@ -74,26 +90,37 @@ function requireAdmin(req, res, next) {
 /* ---------- Estado público (sin comprobantes ni PINs) ---------- */
 app.get("/api/state", async (_req, res, next) => {
   try {
-    const [players, predRows, resultRows, matches] = await Promise.all([
-      store.allPlayers(), store.allPredictions(), store.allResults(), store.allMatches(),
+    const [players, predRows, resultRows, matches, settings] = await Promise.all([
+      store.allPlayers(), store.allPredictions(), store.allResults(), store.allMatches(), store.getSettings(),
     ]);
     const results = {};
     for (const r of resultRows) results[r.match_id] = { h: r.h, a: r.a };
     const predsByPlayer = {};
     for (const p of predRows) (predsByPlayer[p.player_name] ||= {})[p.match_id] = { h: p.h, a: p.a };
 
+    const ans = {
+      champ: settings.champ || null, runnerup: settings.runnerup || null,
+      scorer: settings.scorer || null, surprise: settings.surprise || null,
+    };
+
     const out = players.map((pl) => {
       const predictions = predsByPlayer[pl.name] || {};
       const perMatch = {};
-      let points = 0;
+      let matchPts = 0;
       for (const m of matches) {
         const pts = scoreMatch(predictions[m.id], results[m.id]);
         perMatch[m.id] = pts;
-        points += pts;
+        matchPts += pts;
       }
+      const jokerPts = pl.joker && perMatch[pl.joker] ? perMatch[pl.joker] : 0; // doble = +1 vez
+      const bonusPts = bonusPoints(pl, ans);
       return {
         name: pl.name, fav: pl.fav, paid: !!pl.receipt,
-        predictions, perMatch, points,
+        predictions, perMatch,
+        bonus: { champ: pl.champ || null, runnerup: pl.runnerup || null, scorer: pl.scorer || null, surprise: pl.surprise || null },
+        joker: pl.joker || null,
+        breakdown: { match: matchPts, joker: jokerPts, bonus: bonusPts },
+        points: matchPts + jokerPts + bonusPts,
         filled: Object.keys(predictions).length,
       };
     });
@@ -108,6 +135,7 @@ app.get("/api/state", async (_req, res, next) => {
     res.json({
       players: out, results, matches: matchesOut,
       totalMatches: matches.length, deadline: DEADLINE_ISO,
+      globalLocked: globalLocked(), bonusAnswers: ans, bonusPts: BONUS,
     });
   } catch (e) { next(e); }
 });
@@ -180,6 +208,48 @@ app.post("/api/predictions", async (req, res, next) => {
     }
     const total = (await store.allPredictions()).filter((p) => p.player_name === name).length;
     res.json({ ok: true, saved, locked, count: total });
+  } catch (e) { next(e); }
+});
+
+/* ---------- Predicciones bonus del torneo (campeón, etc.) ---------- */
+app.post("/api/bonus", async (req, res, next) => {
+  try {
+    const name = (req.body.name || "").trim();
+    const pin = (req.body.pin || "").trim();
+    const player = await store.getPlayer(name);
+    if (!player) return res.status(404).json({ error: "Regístrate primero" });
+    if (player.pin_hash !== hashPin(pin)) return res.status(403).json({ error: "PIN incorrecto 😏" });
+    if (globalLocked()) return res.status(403).json({ error: "⏰ Las predicciones bonus ya cerraron (arrancó el Mundial)." });
+
+    const team = (v) => (v && TEAMS[v] ? v : null);
+    const scorer = (req.body.scorer || "").trim().slice(0, 40) || null;
+    await store.setBonus(name, {
+      champ: team(req.body.champ), runnerup: team(req.body.runnerup),
+      surprise: team(req.body.surprise), scorer,
+    });
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+/* ---------- Comodín: doblar puntos de un partido (debe estar abierto) ---------- */
+app.post("/api/joker", async (req, res, next) => {
+  try {
+    const name = (req.body.name || "").trim();
+    const pin = (req.body.pin || "").trim();
+    const matchId = (req.body.matchId || "").trim();
+    const player = await store.getPlayer(name);
+    if (!player) return res.status(404).json({ error: "Regístrate primero" });
+    if (player.pin_hash !== hashPin(pin)) return res.status(403).json({ error: "PIN incorrecto 😏" });
+
+    if (matchId) {
+      const m = (await store.allMatches()).find((x) => x.id === matchId);
+      if (!m) return res.status(404).json({ error: "Ese partido no existe" });
+      if (matchLocked(m)) return res.status(403).json({ error: "Ese partido ya cerró: elige uno que aún esté abierto." });
+      await store.setJoker(name, matchId);
+    } else {
+      await store.setJoker(name, null); // quitar comodín
+    }
+    res.json({ ok: true });
   } catch (e) { next(e); }
 });
 
@@ -303,6 +373,18 @@ app.delete("/api/admin/match/:id", requireAdmin, async (req, res, next) => {
     if (!m) return res.status(404).json({ error: "No existe ese partido" });
     if (m.round === "Grupos") return res.status(400).json({ error: "No se pueden borrar partidos de la fase de grupos" });
     await store.deleteMatch(req.params.id);
+    res.json({ ok: true });
+  } catch (e) { next(e); }
+});
+
+// (Admin) respuestas oficiales del bonus (campeón, subcampeón, goleador, sorpresa)
+app.post("/api/admin/bonus", requireAdmin, async (req, res, next) => {
+  try {
+    const team = (v) => (v && TEAMS[v] ? v : null);
+    await store.setSettings({
+      champ: team(req.body.champ), runnerup: team(req.body.runnerup),
+      surprise: team(req.body.surprise), scorer: (req.body.scorer || "").trim().slice(0, 40) || null,
+    });
     res.json({ ok: true });
   } catch (e) { next(e); }
 });

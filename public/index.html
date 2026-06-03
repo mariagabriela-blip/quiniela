@@ -28,6 +28,7 @@
   <nav class="tabs" id="tabs">
     <button class="tab active" data-tab="registro">📝 Registro</button>
     <button class="tab" data-tab="quiniela">⚽ Mi Quiniela</button>
+    <button class="tab" data-tab="extras">🎁 Extras</button>
     <button class="tab" data-tab="reglas">📖 Reglas</button>
     <button class="tab" data-tab="tabla">🏅 Tabla</button>
     <button class="tab" data-tab="admin">🔐 Admin</button>
@@ -96,6 +97,13 @@
       <button id="saveQuiniela" class="btn-primary hidden">💾 Guardar mi Quiniela</button>
     </section>
 
+    <!-- ============ EXTRAS (bonus + comodín) ============ -->
+    <section class="panel" id="extras">
+      <h2>🎁 Extras: Bonus y Comodín</h2>
+      <p class="muted">Suma puntos extra acertando el campeón y compañía, y dobla los puntos de un partido con tu comodín.</p>
+      <div id="extrasBody"></div>
+    </section>
+
     <!-- ============ REGLAS ============ -->
     <section class="panel" id="reglas">
       <h2>📖 Las Normas Básicas</h2>
@@ -158,6 +166,17 @@
           <input type="datetime-local" id="rdDeadline" />
         </label>
         <button id="rdApply" class="btn-primary" type="button">⏲️ Aplicar cierre a la ronda</button>
+      </form>
+
+      <hr/>
+      <h3>🏆 Respuestas del Bonus (resultado oficial)</h3>
+      <p class="muted small">Al terminar el Mundial, carga aquí el campeón, subcampeón, goleador y la sorpresa para repartir los puntos bonus.</p>
+      <form id="adminBonusCard" class="card" onsubmit="return false">
+        <label>🏆 Campeón <select id="abChamp"></select></label>
+        <label>🥈 Subcampeón <select id="abRunner"></select></label>
+        <label>👟 Goleador (nombre) <input type="text" id="abScorer" maxlength="40" placeholder="Ej: Mbappé" /></label>
+        <label>😮 Sorpresa <select id="abSurprise"></select></label>
+        <button id="saveBonusAns" class="btn-primary" type="button">💾 Guardar respuestas del bonus</button>
       </form>
 
       <hr/>
