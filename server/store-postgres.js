@@ -14,10 +14,17 @@ const connectionString =
 // Neon/Vercel requieren SSL. Para un Postgres local sin SSL: PGSSLMODE=disable
 const ssl = process.env.PGSSLMODE === "disable" ? false : { rejectUnauthorized: false };
 
-const pool = new Pool({ connectionString, ssl, max: 3 });
+// connectionTimeoutMillis alto: el plan gratis de Neon se "duerme" y tarda
+// 1-2s en despertar; le damos tiempo para que la 1ª conexión no falle.
+const pool = new Pool({
+  connectionString, ssl, max: 3,
+  connectionTimeoutMillis: 15000,
+  idleTimeoutMillis: 10000,
+  keepAlive: true,
+});
 pool.on("error", (e) => console.error("Postgres pool error:", e.message));
 
-const ready = (async () => {
+async function init() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS players (
       name       TEXT PRIMARY KEY,
@@ -78,12 +85,25 @@ const ready = (async () => {
       client.release();
     }
   }
-})();
-ready.catch((e) => console.error("Error inicializando Postgres:", e.message));
+}
+
+// Inicialización resiliente: si falla (p.ej. Neon despertando), NO se queda
+// pegada en error — se reintenta en la siguiente petición.
+let initPromise = null;
+function ensureReady() {
+  if (!initPromise) {
+    initPromise = init().catch((e) => {
+      console.error("Error inicializando Postgres (se reintentará):", e.message);
+      initPromise = null; // permite reintentar
+      throw e;
+    });
+  }
+  return initPromise;
+}
 
 module.exports = {
   kind: "postgres",
-  ready,
+  get ready() { return ensureReady(); },
 
   async allPlayers() {
     const { rows } = await pool.query("SELECT * FROM players ORDER BY created_at ASC");
