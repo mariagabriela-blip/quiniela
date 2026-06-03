@@ -257,6 +257,27 @@ function matchesByRound() {
   return rounds;
 }
 function openMatches() { return getMatches().filter((m) => !m.locked); }
+
+// Dibuja un partido con el marcador de CADA equipo justo debajo de su bandera.
+function matchRow(m, vH, vA, opts = {}) {
+  const { dis = "", showLock = false, dim = false } = opts;
+  const sub = m.group ? `Grupo ${m.group}` : `${m.round}${m.slot ? " #" + m.slot : ""}`;
+  const lock = showLock && m.locked ? ' <span class="lockt">🔒 cerrado</span>' : "";
+  const teamCol = (code, side, val) => `
+    <div class="team">
+      <span class="fl">${teamFlag(code)}</span>
+      <span class="nm">${TEAMS[code]?.name || code}</span>
+      <input class="score-in" type="number" inputmode="numeric" min="0" max="30"
+             data-mid="${m.id}" data-side="${side}" value="${val ?? ""}" ${dis}
+             aria-label="Goles de ${TEAMS[code]?.name || code}" />
+    </div>`;
+  return `<div class="match${dim && m.locked ? " mlocked" : ""}">
+    <div class="grp">${sub}${lock}</div>
+    ${teamCol(m.home, "h", vH)}
+    <div class="vs"><span class="x">vs</span></div>
+    ${teamCol(m.away, "a", vA)}
+  </div>`;
+}
 function roundLabel(r) {
   const map = {
     Grupos: "⚽ Fase de Grupos", Dieciseisavos: "🏟️ Dieciseisavos",
@@ -328,19 +349,7 @@ function renderQuiniela() {
     const header = `<div class="round-head">${roundLabel(r.round)}</div>`;
     const items = r.items.map((m) => {
       const p = preds[m.id] || {};
-      const dis = m.locked ? "disabled" : "";
-      const sub = m.group ? `Grupo ${m.group}` : `${r.round}${m.slot ? " #" + m.slot : ""}`;
-      const lock = m.locked ? ' <span class="lockt">🔒 cerrado</span>' : "";
-      return `<div class="match${m.locked ? " mlocked" : ""}">
-        <div class="grp">${sub}${lock}</div>
-        ${teamHTML(m.home)}
-        <div class="vs">
-          <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="h" value="${p.h ?? ""}" ${dis} />
-          <span class="x">vs</span>
-          <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="a" value="${p.a ?? ""}" ${dis} />
-        </div>
-        ${teamHTML(m.away)}
-      </div>`;
+      return matchRow(m, p.h, p.a, { dis: m.locked ? "disabled" : "", showLock: true, dim: true });
     }).join("");
     return header + items;
   }).join("");
@@ -477,7 +486,6 @@ async function renderAdmin() {
     const header = `<div class="round-head">${roundLabel(r.round)}</div>`;
     const items = r.items.map((m) => {
       const rr = lastState.results[m.id] || {};
-      const sub = m.group ? `Grupo ${m.group}` : `${r.round}${m.slot ? " #" + m.slot : ""}`;
       const koSel = m.round !== "Grupos"
         ? `<div class="winrow">🏃 Avanzó:
              <select class="winsel" data-mid="${m.id}">
@@ -487,16 +495,7 @@ async function renderAdmin() {
              </select> <span class="muted small">(elige aquí si hubo penales)</span>
            </div>`
         : "";
-      return `<div class="match">
-        <div class="grp">${sub}</div>
-        ${teamHTML(m.home)}
-        <div class="vs">
-          <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="h" value="${rr.h ?? ""}" />
-          <span class="x">vs</span>
-          <input class="score-in" type="number" min="0" max="30" data-mid="${m.id}" data-side="a" value="${rr.a ?? ""}" />
-        </div>
-        ${teamHTML(m.away)}
-      </div>${koSel}`;
+      return matchRow(m, rr.h, rr.a, {}) + koSel;
     }).join("");
     return header + items;
   }).join("");

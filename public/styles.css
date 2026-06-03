@@ -185,7 +185,8 @@ input[type=file] { font-size: .9rem; padding: 8px 0; }
 }
 .team { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
 .team .fl { font-size: 2.1rem; line-height: 1; }
-.team .nm { font-weight: 800; font-size: .9rem; }
+.team .nm { font-weight: 800; font-size: .9rem; min-height: 2.2em; display: flex; align-items: center; }
+.team .score-in { margin-top: 4px; }
 .score-in {
   width: 54px; text-align: center; font-size: 1.3rem; font-weight: 900;
   -moz-appearance: textfield;
