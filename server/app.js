@@ -11,8 +11,10 @@ const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
 
-const { TEAMS, scoreMatch, DEADLINE, BONUS } = require("../public/shared-data.js");
+const { TEAMS, scoreMatch, DEADLINE, BONUS, GOLEADORES } = require("../public/shared-data.js");
 const store = require("./store.js");
+
+const SCORERS = new Set(GOLEADORES);
 
 const ADMIN_PIN = process.env.ADMIN_PIN || "1234";
 const DEADLINE_ISO = process.env.QUINIELA_DEADLINE || DEADLINE; // cierre por defecto (grupos)
@@ -222,7 +224,7 @@ app.post("/api/bonus", async (req, res, next) => {
     if (globalLocked()) return res.status(403).json({ error: "⏰ Las predicciones bonus ya cerraron (arrancó el Mundial)." });
 
     const team = (v) => (v && TEAMS[v] ? v : null);
-    const scorer = (req.body.scorer || "").trim().slice(0, 40) || null;
+    const scorer = SCORERS.has(req.body.scorer) ? req.body.scorer : null;
     await store.setBonus(name, {
       champ: team(req.body.champ), runnerup: team(req.body.runnerup),
       surprise: team(req.body.surprise), scorer,
@@ -383,7 +385,7 @@ app.post("/api/admin/bonus", requireAdmin, async (req, res, next) => {
     const team = (v) => (v && TEAMS[v] ? v : null);
     await store.setSettings({
       champ: team(req.body.champ), runnerup: team(req.body.runnerup),
-      surprise: team(req.body.surprise), scorer: (req.body.scorer || "").trim().slice(0, 40) || null,
+      surprise: team(req.body.surprise), scorer: SCORERS.has(req.body.scorer) ? req.body.scorer : null,
     });
     res.json({ ok: true });
   } catch (e) { next(e); }

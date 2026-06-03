@@ -20,6 +20,7 @@
     root.CUOTA = data.CUOTA;
     root.MONEDA = data.MONEDA;
     root.BONUS = data.BONUS;
+    root.GOLEADORES = data.GOLEADORES;
   }
 })(typeof self !== "undefined" ? self : this, function () {
 
@@ -41,6 +42,36 @@
      Aciertos del torneo completo (se pronostican antes de que arranque).
      👉 Cambia los valores a tu gusto. */
   const BONUS = { champ: 10, runnerup: 6, scorer: 8, surprise: 5 };
+
+  /* ---------- Candidatos a Goleador (Botín de Oro) ----------
+     Lista desplegable para que jugador y admin elijan EXACTAMENTE lo mismo
+     (así nunca falla por cómo se escriba el nombre).
+     👉 Agrega o quita nombres a tu gusto ANTES de que arranque el Mundial. */
+  const GOLEADORES = [
+    "Kylian Mbappé (Francia)", "Ousmane Dembélé (Francia)",
+    "Lionel Messi (Argentina)", "Lautaro Martínez (Argentina)", "Julián Álvarez (Argentina)",
+    "Vinícius Jr (Brasil)", "Rodrygo (Brasil)", "Raphinha (Brasil)", "Endrick (Brasil)",
+    "Lamine Yamal (España)", "Álvaro Morata (España)", "Pedri (España)", "Dani Olmo (España)",
+    "Harry Kane (Inglaterra)", "Jude Bellingham (Inglaterra)", "Phil Foden (Inglaterra)", "Bukayo Saka (Inglaterra)",
+    "Cristiano Ronaldo (Portugal)", "Bruno Fernandes (Portugal)", "Rafael Leão (Portugal)",
+    "Cody Gakpo (Países Bajos)", "Memphis Depay (Países Bajos)",
+    "Florian Wirtz (Alemania)", "Kai Havertz (Alemania)", "Niclas Füllkrug (Alemania)",
+    "Romelu Lukaku (Bélgica)", "Loïs Openda (Bélgica)", "Kevin De Bruyne (Bélgica)",
+    "Darwin Núñez (Uruguay)",
+    "Luis Díaz (Colombia)", "James Rodríguez (Colombia)", "Jhon Durán (Colombia)",
+    "Raúl Jiménez (México)", "Santiago Giménez (México)",
+    "Christian Pulisic (Estados Unidos)", "Folarin Balogun (Estados Unidos)",
+    "Erling Haaland (Noruega)",
+    "Viktor Gyökeres (Suecia)", "Alexander Isak (Suecia)",
+    "Youssef En-Nesyri (Marruecos)", "Achraf Hakimi (Marruecos)",
+    "Takefusa Kubo (Japón)", "Kaoru Mitoma (Japón)",
+    "Son Heung-min (Corea del Sur)",
+    "Mohamed Salah (Egipto)",
+    "Mehdi Taremi (Irán)",
+    "Enner Valencia (Ecuador)",
+    "Breel Embolo (Suiza)",
+    "Sébastien Haller (Costa de Marfil)",
+  ];
 
   /* ---------- Equipos (sorteo final del 5 de diciembre de 2025) ---------- */
   const TEAMS = {
@@ -166,5 +197,5 @@
     return 0;
   }
 
-  return { TEAMS, MATCHES, JOKES, scoreMatch, DEADLINE, CUOTA, MONEDA, BONUS };
+  return { TEAMS, MATCHES, JOKES, scoreMatch, DEADLINE, CUOTA, MONEDA, BONUS, GOLEADORES };
 });

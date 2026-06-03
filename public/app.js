@@ -385,6 +385,11 @@ function teamSelect(id, sel) {
     Object.entries(TEAMS).map(([c, t]) => `<option value="${c}" ${c === sel ? "selected" : ""}>${t.flag} ${t.name}</option>`).join("") +
     "</select>";
 }
+function scorerOptions(sel) {
+  const list = typeof GOLEADORES !== "undefined" ? GOLEADORES : [];
+  return '<option value="">— elige —</option>' +
+    list.map((n) => `<option value="${n}" ${n === sel ? "selected" : ""}>${n}</option>`).join("");
+}
 function renderExtras() {
   const body = $("#extrasBody");
   const rec = myRecord();
@@ -413,8 +418,8 @@ function renderExtras() {
       <p class="muted small">${gLocked ? "🔒 Ya cerraron (arrancó el Mundial)." : "Editables hasta que arranque el Mundial."} Puntos: campeón +${bp.champ}, subcampeón +${bp.runnerup}, goleador +${bp.scorer}, sorpresa +${bp.surprise}.</p>
       <label>🏆 Campeón ${teamSelect("xChamp", b.champ)}</label>
       <label>🥈 Subcampeón ${teamSelect("xRunner", b.runnerup)}</label>
-      <label>👟 Goleador (nombre)
-        <input type="text" id="xScorer" maxlength="40" placeholder="Ej: Mbappé" value="${b.scorer ? b.scorer.replace(/"/g, "&quot;") : ""}" />
+      <label>👟 Goleador (Botín de Oro)
+        <select id="xScorer">${scorerOptions(b.scorer)}</select>
       </label>
       <label>😮 Sorpresa del Mundial ${teamSelect("xSurprise", b.surprise)}</label>
       <button class="btn-primary" id="saveBonus" type="button" ${dis}>💾 Guardar predicciones</button>
@@ -674,7 +679,7 @@ function renderAdminBonus() {
   if ($("#abChamp")) $("#abChamp").innerHTML = teamOptions(a.champ);
   if ($("#abRunner")) $("#abRunner").innerHTML = teamOptions(a.runnerup);
   if ($("#abSurprise")) $("#abSurprise").innerHTML = teamOptions(a.surprise);
-  if ($("#abScorer")) $("#abScorer").value = a.scorer || "";
+  if ($("#abScorer")) $("#abScorer").innerHTML = scorerOptions(a.scorer);
 }
 $("#saveBonusAns")?.addEventListener("click", async () => {
   if (!adminPin) return promptAdmin();
