@@ -34,7 +34,7 @@
   /* ---------- El Pozo (premio) ----------
      Cuánto paga cada jugador y el símbolo de la moneda. El bote se calcula
      automáticamente: (jugadores que pagaron) x CUOTA. 👉 Cámbialo a tu gusto. */
-  const CUOTA = 10;
+  const CUOTA = 15;
   const MONEDA = "$";
 
   /* ---------- Puntos extra (bonus) ----------
