@@ -604,15 +604,25 @@ async function renderAdmin() {
           const paid = p.paid
             ? `<span class="pa-paid paid-yes">Pagó ✅</span>`
             : `<span class="pa-paid paid-no">Sin pago ❌</span>`;
-          const link = p.receipt ? ` · <a href="${p.receipt}" target="_blank">ver comprobante</a>` : "";
+          const thumb = p.receipt
+            ? `<img class="rcpt-thumb" src="${p.receipt}" alt="comprobante de ${p.name}" title="toca para ampliar" />`
+            : "";
           return `<div class="player-admin">
-            <span class="pa-name">${p.name}</span>
-            <span>${paid}${link}</span>
+            <div class="pa-row"><span class="pa-name">${p.name}</span> ${paid}</div>
+            ${thumb}
           </div>`;
         }).join("")
       : '<p class="empty">No hay jugadores todavía.</p>';
+    $$(".rcpt-thumb").forEach((t) => t.addEventListener("click", () => openImg(t.src)));
   } catch (e) { pa.innerHTML = `<p class="empty">⚠️ ${e.message}</p>`; }
 }
+
+// Visor de imagen dentro de la página (los navegadores bloquean abrir data: URLs)
+function openImg(src) {
+  $("#imgModalPic").src = src;
+  $("#imgModal").classList.remove("hidden");
+}
+$("#imgModal")?.addEventListener("click", () => $("#imgModal").classList.add("hidden"));
 
 function teamOptions(sel) {
   return '<option value="">— equipo —</option>' +
