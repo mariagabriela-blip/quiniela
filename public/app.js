@@ -95,7 +95,51 @@ function renderActivePanel() {
   if (activeTab === "extras") renderExtras();
   if (activeTab === "tabla") renderLeaderboard();
   if (activeTab === "bymatch") renderByMatch();
+  if (activeTab === "comodines") renderComodines();
   if (activeTab === "admin") renderAdmin();
+}
+
+/* ============================================================
+   COMODINES — quién dobló qué partido (ronda actual primero)
+   ============================================================ */
+function currentRound() {
+  const rounds = matchesByRound();
+  for (const r of rounds) if (r.items.some((m) => !m.locked)) return r.round;
+  return rounds.length ? rounds[rounds.length - 1].round : null;
+}
+function renderComodines() {
+  const box = $("#comodinesBody");
+  const players = lastState.players || [];
+  if (!players.length) { box.innerHTML = '<p class="empty">Aún no hay jugadores.</p>'; return; }
+  const byId = Object.fromEntries(getMatches().map((m) => [m.id, m]));
+  const anyResults = Object.keys(lastState.results).length > 0;
+  const cur = currentRound();
+  const withJ = players.filter((p) => p.joker && byId[p.joker]);
+  const inCur = withJ.filter((p) => byId[p.joker].round === cur);
+  const others = withJ.filter((p) => byId[p.joker].round !== cur);
+  const none = players.filter((p) => !p.joker || !byId[p.joker]);
+
+  const matchTxt = (m) => `${teamFlag(m.home)} ${TEAMS[m.home]?.name || m.home} vs ${TEAMS[m.away]?.name || m.away} ${teamFlag(m.away)}`;
+  const row = (p, showRound) => {
+    const m = byId[p.joker];
+    const pre = showRound ? `<span class="bm-sub" style="display:inline">${roundLabel(m.round).replace(/^[^ ]+ /, "")}</span> · ` : "";
+    const pts = anyResults ? `<span class="bm-pts">+${p.breakdown?.joker || 0}</span>` : "";
+    return `<div class="bm-row"><span class="bm-name">✨ ${p.name}</span><span class="bm-guess" style="text-align:right">${pre}${matchTxt(m)}</span>${pts}</div>`;
+  };
+
+  let html = `<div class="bm-card">
+    <div class="bm-head"><span class="bm-sub">Ronda actual</span><span class="bm-teams">${cur ? roundLabel(cur) : "—"}</span></div>
+    ${inCur.length ? inCur.map((p) => row(p, false)).join("") : '<div class="muted small" style="padding:6px 2px">Nadie tiene su comodín en esta ronda.</div>'}
+  </div>`;
+  if (others.length) {
+    html += `<div class="round-head">✨ Comodines en otras rondas</div>
+      <div class="bm-card">${others.map((p) => row(p, true)).join("")}</div>`;
+  }
+  if (none.length) {
+    html += `<div class="round-head">Sin comodín todavía</div>
+      <div class="bm-card">${none.map((p) => `<div class="bm-row"><span class="bm-name">${p.name}</span><span class="muted small">— sin comodín —</span></div>`).join("")}</div>`;
+  }
+  box.innerHTML = html;
 }
 
 /* ============================================================
@@ -523,6 +567,30 @@ function renderPozo() {
     `<span class="small">(cuota ${mon}${cuota} c/u) · ¡se lo lleva el 1er lugar! 🏆</span>`;
 }
 
+const lbOpen = new Set(); // nombres de jugadores con su quiniela desplegada (persiste)
+
+function lbDetailHTML(p) {
+  const anyResults = Object.keys(lastState.results).length > 0;
+  const bd = p.breakdown || { match: 0, joker: 0, bonus: 0 };
+  const jm = p.joker ? getMatches().find((m) => m.id === p.joker) : null;
+  const jtxt = jm ? `${teamFlag(jm.home)} vs ${teamFlag(jm.away)}` : "—";
+  const head = `<div class="det-sum">⚽ Partidos <b>${bd.match}</b> · ✨ Comodín <b>+${bd.joker}</b> (${jtxt}) · 🏆 Bonus <b>+${bd.bonus}</b></div>`;
+  return head + getMatches().map((m) => {
+    const pr = p.predictions[m.id];
+    const rr = lastState.results[m.id];
+    const guess = pr ? `${pr.h}-${pr.a}` : "—";
+    const real = rr ? `${rr.h}-${rr.a}` : "·";
+    const pts = anyResults ? `<b>+${p.perMatch[m.id] || 0}</b>` : "";
+    const jk = m.id === p.joker ? "✨ " : "";
+    return `<div class="det-row">
+      <span>${jk}${teamFlag(m.home)} vs ${teamFlag(m.away)}</span>
+      <span class="g">tú: ${guess}</span>
+      <span class="r">real: ${real}</span>
+      <span class="pp">${pts}</span>
+    </div>`;
+  }).join("");
+}
+
 function renderLeaderboard() {
   renderPozo();
   const lb = $("#leaderboard");
@@ -533,48 +601,36 @@ function renderLeaderboard() {
   }
   const medals = ["🥇", "🥈", "🥉"];
   const cls = ["gold", "silver", "bronze"];
-  const anyResults = Object.keys(lastState.results).length > 0;
 
   lb.innerHTML = players.map((p, i) => {
     const fav = p.fav ? teamFlag(p.fav) : "🏳️";
     const paid = p.paid ? "" : ' <small>(sin pago 💸)</small>';
     const mine = me && p.name === me.name ? " is-me" : "";
+    const open = lbOpen.has(p.name);
     return `<div class="lb-wrap">
       <div class="lb-row ${cls[i] || ""}${mine}">
         <div class="pos">${medals[i] || (i + 1)}</div>
-        <div class="who">${fav} ${p.name}${paid} <span class="tap">👁️ ver quiniela</span></div>
+        <div class="who">${fav} ${p.name}${paid} <span class="tap">${open ? "🔼 ocultar" : "👁️ ver quiniela"}</span></div>
         <div class="pts-badge">${p.points} pts</div>
       </div>
-      <div class="lb-detail hidden" id="d-${i}"></div>
+      <div class="lb-detail ${open ? "" : "hidden"}" id="d-${i}">${open ? lbDetailHTML(p) : ""}</div>
     </div>`;
   }).join("");
 
   $$(".lb-row").forEach((row, i) => {
     row.addEventListener("click", () => {
-      const det = $("#d-" + i);
-      const open = !det.classList.contains("hidden");
-      $$(".lb-detail").forEach((d) => d.classList.add("hidden"));
-      if (open) return;
       const p = players[i];
-      const bd = p.breakdown || { match: 0, joker: 0, bonus: 0 };
-      const jm = p.joker ? getMatches().find((m) => m.id === p.joker) : null;
-      const jtxt = jm ? `${teamFlag(jm.home)} vs ${teamFlag(jm.away)}` : "—";
-      const head = `<div class="det-sum">⚽ Partidos <b>${bd.match}</b> · ✨ Comodín <b>+${bd.joker}</b> (${jtxt}) · 🏆 Bonus <b>+${bd.bonus}</b></div>`;
-      det.innerHTML = head + getMatches().map((m) => {
-        const pr = p.predictions[m.id];
-        const rr = lastState.results[m.id];
-        const guess = pr ? `${pr.h}-${pr.a}` : "—";
-        const real = rr ? `${rr.h}-${rr.a}` : "·";
-        const pts = anyResults ? `<b>+${p.perMatch[m.id] || 0}</b>` : "";
-        const jk = m.id === p.joker ? "✨ " : "";
-        return `<div class="det-row">
-          <span>${jk}${teamFlag(m.home)} vs ${teamFlag(m.away)}</span>
-          <span class="g">tú: ${guess}</span>
-          <span class="r">real: ${real}</span>
-          <span class="pp">${pts}</span>
-        </div>`;
-      }).join("");
-      det.classList.remove("hidden");
+      const det = $("#d-" + i);
+      const tap = row.querySelector(".tap");
+      if (lbOpen.has(p.name)) {
+        lbOpen.delete(p.name);
+        det.classList.add("hidden"); det.innerHTML = "";
+        if (tap) tap.textContent = "👁️ ver quiniela";
+      } else {
+        lbOpen.add(p.name);
+        det.innerHTML = lbDetailHTML(p); det.classList.remove("hidden");
+        if (tap) tap.textContent = "🔼 ocultar";
+      }
     });
   });
 }
@@ -832,7 +888,7 @@ tick();
   if (stateError) toast("⚠️ " + stateError);
   const rec = myRecord();
   if (rec && rec.fav) $("#favTeam").value = rec.fav;
-  setInterval(() => { if (activeTab === "tabla" || activeTab === "bymatch") refreshState(); }, 8000);
+  setInterval(() => { if (["tabla", "bymatch", "comodines"].includes(activeTab)) refreshState(); }, 8000);
   // Cuenta regresiva en vivo (cada segundo) mientras ves tu quiniela
   setInterval(() => { if (activeTab === "quiniela") renderDeadlineBanner(); }, 1000);
 })();
