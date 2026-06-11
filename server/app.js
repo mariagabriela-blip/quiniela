@@ -29,11 +29,12 @@ const clampScore = (v) => {
   return n;
 };
 // Cierre por partido:
-//  - Grupos: usa su fecha (o el cierre global por defecto).
+//  - Grupos: SIEMPRE el cierre global (DEADLINE_ISO / QUINIELA_DEADLINE), así
+//    se puede abrir/cerrar toda la fase de grupos cambiando una sola fecha.
 //  - Eliminatorias: si no tienen fecha asignada, están ABIERTAS (el admin la pone luego).
 function matchDeadline(m) {
   if (!m) return null;
-  if (m.round === "Grupos") return m.deadline || DEADLINE_ISO;
+  if (m.round === "Grupos") return DEADLINE_ISO;
   return m.deadline || null;
 }
 function matchLocked(m) {

@@ -30,7 +30,7 @@
      hasta el día antes (se cierra el 11 a las 00:00, hora de Venezuela, UTC-4).
      👉 Cambia esta fecha si quieres otro cierre. Formato ISO con zona horaria.
      (En el servidor también puedes sobrescribirla con la variable QUINIELA_DEADLINE.) */
-  const DEADLINE = "2026-06-11T00:00:00-04:00";
+  const DEADLINE = "2026-06-11T12:00:00-04:00";
 
   /* ---------- El Pozo (premio) ----------
      Cuánto paga cada jugador y el símbolo de la moneda. El bote se calcula
