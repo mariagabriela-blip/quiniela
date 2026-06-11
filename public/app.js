@@ -94,7 +94,50 @@ function renderActivePanel() {
   if (activeTab === "quiniela") renderQuiniela();
   if (activeTab === "extras") renderExtras();
   if (activeTab === "tabla") renderLeaderboard();
+  if (activeTab === "bymatch") renderByMatch();
   if (activeTab === "admin") renderAdmin();
+}
+
+/* ============================================================
+   POR PARTIDO — cada juego y lo que puso cada jugador
+   ============================================================ */
+function renderByMatch() {
+  const box = $("#byMatchBody");
+  const matches = getMatches();
+  if (!matches.length) { box.innerHTML = '<p class="empty">Aún no hay partidos.</p>'; return; }
+  const players = lastState.players || [];
+
+  box.innerHTML = matchesByRound().map((r) => {
+    const header = `<div class="round-head">${roundLabel(r.round)}</div>`;
+    const cards = r.items.map((m) => {
+      const rr = lastState.results[m.id];
+      const real = rr ? `${rr.h} - ${rr.a}` : "vs";
+      const sub = m.group ? `Grupo ${m.group}` : `${r.round}${m.slot ? " #" + m.slot : ""}`;
+      // jugadores que pronosticaron este partido, los aciertos arriba
+      const preds = players
+        .filter((p) => p.predictions[m.id])
+        .map((p) => ({ name: p.name, pr: p.predictions[m.id], pts: p.perMatch[m.id] || 0, joker: p.joker === m.id }))
+        .sort((a, b) => b.pts - a.pts || a.name.localeCompare(b.name));
+      const rows = preds.length
+        ? preds.map((x) => {
+            const ptsTxt = rr ? `<span class="bm-pts">+${x.pts}</span>` : "";
+            return `<div class="bm-row">
+              <span class="bm-name">${x.joker ? "✨ " : ""}${x.name}</span>
+              <span class="bm-guess">${x.pr.h}-${x.pr.a}</span>
+              ${ptsTxt}
+            </div>`;
+          }).join("")
+        : '<div class="muted small" style="padding:6px 2px">Nadie pronosticó este partido.</div>';
+      return `<div class="bm-card">
+        <div class="bm-head">
+          <span class="bm-sub">${sub}</span>
+          <span class="bm-teams">${teamFlag(m.home)} ${TEAMS[m.home]?.name || m.home} <b class="bm-real">${real}</b> ${TEAMS[m.away]?.name || m.away} ${teamFlag(m.away)}</span>
+        </div>
+        ${rows}
+      </div>`;
+    }).join("");
+    return header + cards;
+  }).join("");
 }
 
 /* ============================================================
@@ -799,7 +842,7 @@ tick();
   if (stateError) toast("⚠️ " + stateError);
   const rec = myRecord();
   if (rec && rec.fav) $("#favTeam").value = rec.fav;
-  setInterval(() => { if (activeTab === "tabla") refreshState(); }, 8000);
+  setInterval(() => { if (activeTab === "tabla" || activeTab === "bymatch") refreshState(); }, 8000);
   // Cuenta regresiva en vivo (cada segundo) mientras ves tu quiniela
   setInterval(() => { if (activeTab === "quiniela") renderDeadlineBanner(); }, 1000);
 })();

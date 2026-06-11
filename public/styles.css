@@ -236,6 +236,18 @@ input[type=file] { font-size: .9rem; padding: 8px 0; }
 }
 .det-row:last-child { border-bottom: none; }
 .det-sum { font-size: .82rem; background: #eef4ea; border-radius: 8px; padding: 7px 10px; margin-bottom: 8px; font-weight: 600; color: #2a4020; }
+
+/* ============ Por Partido ============ */
+.bm-card { background: var(--card); border-radius: 14px; padding: 12px 14px; box-shadow: var(--shadow); margin-bottom: 12px; }
+.bm-head { text-align: center; border-bottom: 2px solid #eef0ec; padding-bottom: 8px; margin-bottom: 8px; }
+.bm-sub { display: block; font-size: .7rem; font-weight: 800; color: var(--green-dark); text-transform: uppercase; letter-spacing: 1px; }
+.bm-teams { font-weight: 800; font-size: .95rem; }
+.bm-real { color: var(--red); margin: 0 6px; font-size: 1.05rem; }
+.bm-row { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 5px 2px; border-bottom: 1px dashed #eef0ec; }
+.bm-row:last-child { border-bottom: none; }
+.bm-name { font-weight: 700; }
+.bm-guess { font-weight: 900; color: #0c5e8f; }
+.bm-pts { background: var(--green); color: #fff; border-radius: 999px; padding: 2px 9px; font-weight: 800; font-size: .8rem; min-width: 34px; text-align: center; }
 .det-row .g { color: #0c5e8f; font-weight: 700; }
 .det-row .r { color: var(--red); font-weight: 700; }
 .det-row .pp { text-align: right; color: var(--green-dark); }
