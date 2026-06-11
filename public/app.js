@@ -144,20 +144,39 @@ function renderComodines() {
 
 /* ============================================================
    POR PARTIDO — cada juego y lo que puso cada jugador
+   (orden cronológico: Jornada 1 → 2 → 3 → eliminatorias)
    ============================================================ */
+function matchdayOf(m) {
+  const n = parseInt(String(m.id).slice((m.group || "").length), 10);
+  return Number.isFinite(n) ? Math.ceil(n / 2) : 1;
+}
+function byMatchSections() {
+  const ms = getMatches();
+  const groups = ms.filter((m) => m.round === "Grupos");
+  const sections = [];
+  for (let jd = 1; jd <= 3; jd++) {
+    const items = groups.filter((m) => matchdayOf(m) === jd)
+      .sort((a, b) => (a.group || "").localeCompare(b.group || ""));
+    if (items.length) sections.push({ label: `⚽ Fase de Grupos · Jornada ${jd}`, items });
+  }
+  for (const r of ["Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "3er puesto", "Final"]) {
+    const items = ms.filter((m) => m.round === r).sort((a, b) => (a.slot || 0) - (b.slot || 0));
+    if (items.length) sections.push({ label: roundLabel(r), items });
+  }
+  return sections;
+}
 function renderByMatch() {
   const box = $("#byMatchBody");
   const matches = getMatches();
   if (!matches.length) { box.innerHTML = '<p class="empty">Aún no hay partidos.</p>'; return; }
   const players = lastState.players || [];
 
-  box.innerHTML = matchesByRound().map((r) => {
-    const header = `<div class="round-head">${roundLabel(r.round)}</div>`;
-    const cards = r.items.map((m) => {
+  box.innerHTML = byMatchSections().map((sec) => {
+    const header = `<div class="round-head">${sec.label}</div>`;
+    const cards = sec.items.map((m) => {
       const rr = lastState.results[m.id];
       const real = rr ? `${rr.h} - ${rr.a}` : "vs";
-      const sub = m.group ? `Grupo ${m.group}` : `${r.round}${m.slot ? " #" + m.slot : ""}`;
-      // jugadores que pronosticaron este partido, los aciertos arriba
+      const sub = m.group ? `Grupo ${m.group}` : `${m.round}${m.slot ? " #" + m.slot : ""}`;
       const preds = players
         .filter((p) => p.predictions[m.id])
         .map((p) => ({ name: p.name, pr: p.predictions[m.id], pts: p.perMatch[m.id] || 0, joker: p.joker === m.id }))
