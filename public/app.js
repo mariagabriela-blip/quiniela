@@ -790,16 +790,6 @@ $("#saveResults").addEventListener("click", async () => {
   } catch (err) { toast("⚠️ " + err.message); }
 });
 
-$("#resetAll").addEventListener("click", async () => {
-  if (!adminPin) return promptAdmin();
-  if (!confirm("¿Seguro que quieres borrar TODO (jugadores, pronósticos y resultados)? No se puede deshacer.")) return;
-  try {
-    await api("/api/admin/reset", { method: "POST", headers: { "x-admin-pin": adminPin } });
-    toast("Todo borrado. Tabla rasa. 🧹");
-    await refreshState();
-  } catch (err) { toast("⚠️ " + err.message); }
-});
-
 /* ============================================================
    CONFETTI
    ============================================================ */
