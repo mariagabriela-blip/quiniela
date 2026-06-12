@@ -206,17 +206,12 @@ app.post("/api/predictions", async (req, res, next) => {
 
     const matches = await store.allMatches();
     const byId = Object.fromEntries(matches.map((m) => [m.id, m]));
-    const played = new Set((await store.allResults()).map((r) => r.match_id)); // ya jugados
-    const ov = overrideActive(name); // permiso especial temporal
     const preds = req.body.predictions || {};
     let saved = 0, locked = 0;
     for (const [mid, val] of Object.entries(preds)) {
       const m = byId[mid];
       if (!m) continue;
-      // Editable si el partido está abierto, o si el jugador tiene permiso especial
-      // y el partido AÚN no se ha jugado (sin resultado).
-      const editable = !matchLocked(m) || (ov && !played.has(mid));
-      if (!editable) { locked++; continue; }
+      if (matchLocked(m)) { locked++; continue; } // los marcadores no se tocan tras cerrar
       if (hasBoth(val)) { await store.upsertPrediction(name, mid, clampScore(val.h), clampScore(val.a)); saved++; }
       else { await store.deletePrediction(name, mid); }
     }
@@ -258,7 +253,10 @@ app.post("/api/joker", async (req, res, next) => {
     if (matchId) {
       const m = (await store.allMatches()).find((x) => x.id === matchId);
       if (!m) return res.status(404).json({ error: "Ese partido no existe" });
-      if (matchLocked(m)) return res.status(403).json({ error: "Ese partido ya cerró: elige uno que aún esté abierto." });
+      const played = new Set((await store.allResults()).map((r) => r.match_id));
+      // Editable si está abierto, o si tiene permiso especial y el partido aún no se jugó.
+      const ok = !matchLocked(m) || (overrideActive(name) && !played.has(matchId));
+      if (!ok) return res.status(403).json({ error: "Ese partido ya cerró: elige uno que aún esté abierto." });
       await store.setJoker(name, matchId);
     } else {
       await store.setJoker(name, null); // quitar comodín

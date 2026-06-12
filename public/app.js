@@ -428,13 +428,6 @@ function renderDeadlineBanner() {
   if (!el) return;
   const matches = getMatches();
   if (!matches.length) { el.className = "deadline"; el.innerHTML = ""; return; }
-  const ov = myOverride();
-  if (ov) {
-    const t = new Date(ov).toLocaleString("es-VE", { hour: "2-digit", minute: "2-digit" });
-    el.className = "deadline open";
-    el.innerHTML = `🔓 <b>Acceso especial activo</b> hasta las <b>${t}</b> · puedes editar los partidos que <b>aún no se juegan</b>. ⏳`;
-    return;
-  }
   const open = openMatches();
   if (!open.length) {
     el.className = "deadline locked";
@@ -471,15 +464,14 @@ function renderQuiniela() {
     return;
   }
   need.classList.add("hidden");
-  saveBtn.classList.toggle("hidden", !getMatches().some(isEditable));
+  saveBtn.classList.toggle("hidden", !openMatches().length);
   const preds = rec.predictions || {};
 
   list.innerHTML = matchesByRound().map((r) => {
     const header = `<div class="round-head">${roundLabel(r.round)}</div>`;
     const items = r.items.map((m) => {
       const p = preds[m.id] || {};
-      const editable = isEditable(m);
-      return matchRow(m, p.h, p.a, { dis: editable ? "" : "disabled", showLock: !editable, dim: !editable });
+      return matchRow(m, p.h, p.a, { dis: m.locked ? "disabled" : "", showLock: true, dim: true });
     }).join("");
     return header + items;
   }).join("");
@@ -533,13 +525,20 @@ function renderExtras() {
   const gLocked = !!lastState.globalLocked;
   const dis = gLocked ? "disabled" : "";
 
-  // Comodín: opciones de partidos (deshabilita los cerrados)
+  // Comodín: opciones de partidos. Editable si está abierto, o (con permiso
+  // especial) si el partido aún no se ha jugado. Tu comodín actual siempre se muestra.
+  const ov = myOverride();
   const jokerOpts = '<option value="">— sin comodín —</option>' +
     matchesByRound().map((r) => r.items.map((m) => {
       const lbl = `${roundLabel(r.round).replace(/^[^ ]+ /, "")}: ${teamFlag(m.home)} ${TEAMS[m.home]?.name || m.home} vs ${teamFlag(m.away)} ${TEAMS[m.away]?.name || m.away}`;
-      const d = m.locked && m.id !== rec.joker ? "disabled" : "";
-      return `<option value="${m.id}" ${m.id === rec.joker ? "selected" : ""} ${d}>${m.locked ? "🔒 " : ""}${lbl}</option>`;
+      const canPick = isEditable(m) || m.id === rec.joker;
+      const d = canPick ? "" : "disabled";
+      const ic = !isEditable(m) ? "🔒 " : "";
+      return `<option value="${m.id}" ${m.id === rec.joker ? "selected" : ""} ${d}>${ic}${lbl}</option>`;
     }).join("")).join("");
+  const ovNote = ov
+    ? `<p class="deadline open" style="margin:0 0 4px">🔓 Acceso especial hasta las <b>${new Date(ov).toLocaleString("es-VE", { hour: "2-digit", minute: "2-digit" })}</b>: puedes elegir comodín en partidos que aún no se juegan.</p>`
+    : "";
 
   body.innerHTML = `
     <form id="bonusCard" class="card" onsubmit="return false">
@@ -556,6 +555,7 @@ function renderExtras() {
 
     <form id="jokerCard" class="card" onsubmit="return false">
       <h3>✨ Comodín (puntos dobles)</h3>
+      ${ovNote}
       <p class="muted small">Elige <b>un partido abierto</b>: sus puntos cuentan <b>doble</b>. Puedes cambiarlo mientras ese partido no haya cerrado.</p>
       <label>Partido con doble puntos
         <select id="xJoker">${jokerOpts}</select>
