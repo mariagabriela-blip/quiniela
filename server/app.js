@@ -11,10 +11,16 @@ const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
 
-const { TEAMS, scoreMatch, DEADLINE, BONUS, GOLEADORES } = require("../public/shared-data.js");
+const { TEAMS, scoreMatch, DEADLINE, BONUS, GOLEADORES, OVERRIDE } = require("../public/shared-data.js");
 const store = require("./store.js");
 
 const SCORERS = new Set(GOLEADORES);
+const OVERRIDE_USERS = new Set(((OVERRIDE && OVERRIDE.users) || []).map((s) => String(s).trim().toLowerCase()));
+function overrideActive(name) {
+  if (!OVERRIDE_USERS.has(String(name || "").trim().toLowerCase())) return false;
+  const ms = Date.parse((OVERRIDE && OVERRIDE.until) || "");
+  return Number.isFinite(ms) && Date.now() < ms;
+}
 
 const ADMIN_PIN = process.env.ADMIN_PIN || "1234";
 const DEADLINE_ISO = process.env.QUINIELA_DEADLINE || DEADLINE; // cierre por defecto (grupos)
@@ -200,12 +206,17 @@ app.post("/api/predictions", async (req, res, next) => {
 
     const matches = await store.allMatches();
     const byId = Object.fromEntries(matches.map((m) => [m.id, m]));
+    const played = new Set((await store.allResults()).map((r) => r.match_id)); // ya jugados
+    const ov = overrideActive(name); // permiso especial temporal
     const preds = req.body.predictions || {};
     let saved = 0, locked = 0;
     for (const [mid, val] of Object.entries(preds)) {
       const m = byId[mid];
       if (!m) continue;
-      if (matchLocked(m)) { locked++; continue; } // no se toca un partido ya cerrado
+      // Editable si el partido está abierto, o si el jugador tiene permiso especial
+      // y el partido AÚN no se ha jugado (sin resultado).
+      const editable = !matchLocked(m) || (ov && !played.has(mid));
+      if (!editable) { locked++; continue; }
       if (hasBoth(val)) { await store.upsertPrediction(name, mid, clampScore(val.h), clampScore(val.a)); saved++; }
       else { await store.deletePrediction(name, mid); }
     }

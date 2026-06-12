@@ -21,6 +21,7 @@
     root.MONEDA = data.MONEDA;
     root.BONUS = data.BONUS;
     root.GOLEADORES = data.GOLEADORES;
+    root.OVERRIDE = data.OVERRIDE;
   }
 })(typeof self !== "undefined" ? self : this, function () {
 
@@ -42,6 +43,14 @@
      Aciertos del torneo completo (se pronostican antes de que arranque).
      👉 Cambia los valores a tu gusto. */
   const BONUS = { champ: 10, runnerup: 6, scorer: 8, surprise: 5 };
+
+  /* ---------- Acceso especial (desbloqueo temporal) ----------
+     Permite que ciertos jugadores SIGAN llenando su quiniela aunque ya cerró,
+     pero SOLO en partidos que aún no se han jugado (sin resultado cargado).
+     - users: nombres EXACTOS con que se registraron.
+     - until: hasta cuándo dura el permiso (fecha/hora ISO con zona horaria).
+     Vacío / null = nadie. Ej: { users: ["María"], until: "2026-06-11T20:00:00-04:00" } */
+  const OVERRIDE = { users: [], until: null };
 
   /* ---------- Candidatos a Goleador (Botín de Oro) ----------
      Lista desplegable para que jugador y admin elijan EXACTAMENTE lo mismo
@@ -197,5 +206,5 @@
     return 0;
   }
 
-  return { TEAMS, MATCHES, JOKES, scoreMatch, DEADLINE, CUOTA, MONEDA, BONUS, GOLEADORES };
+  return { TEAMS, MATCHES, JOKES, scoreMatch, DEADLINE, CUOTA, MONEDA, BONUS, GOLEADORES, OVERRIDE };
 });

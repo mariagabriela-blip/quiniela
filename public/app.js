@@ -365,6 +365,21 @@ function matchesByRound() {
 }
 function openMatches() { return getMatches().filter((m) => !m.locked); }
 
+// Permiso especial temporal (configurado en shared-data OVERRIDE).
+function myOverride() {
+  if (!me) return null;
+  const o = (typeof OVERRIDE !== "undefined" && OVERRIDE) ? OVERRIDE : { users: [], until: null };
+  const users = (o.users || []).map((s) => String(s).trim().toLowerCase());
+  if (!users.includes(me.name.trim().toLowerCase())) return null;
+  const until = o.until ? Date.parse(o.until) : NaN;
+  if (!Number.isFinite(until) || Date.now() >= until) return null;
+  return until;
+}
+// Un partido es editable si está abierto, o si tengo permiso especial y aún no se jugó.
+function isEditable(m) {
+  return !m.locked || (!!myOverride() && !lastState.results[m.id]);
+}
+
 // Dibuja un partido con el marcador de CADA equipo justo debajo de su bandera.
 function matchRow(m, vH, vA, opts = {}) {
   const { dis = "", showLock = false, dim = false } = opts;
@@ -413,6 +428,13 @@ function renderDeadlineBanner() {
   if (!el) return;
   const matches = getMatches();
   if (!matches.length) { el.className = "deadline"; el.innerHTML = ""; return; }
+  const ov = myOverride();
+  if (ov) {
+    const t = new Date(ov).toLocaleString("es-VE", { hour: "2-digit", minute: "2-digit" });
+    el.className = "deadline open";
+    el.innerHTML = `🔓 <b>Acceso especial activo</b> hasta las <b>${t}</b> · puedes editar los partidos que <b>aún no se juegan</b>. ⏳`;
+    return;
+  }
   const open = openMatches();
   if (!open.length) {
     el.className = "deadline locked";
@@ -449,14 +471,15 @@ function renderQuiniela() {
     return;
   }
   need.classList.add("hidden");
-  saveBtn.classList.toggle("hidden", !openMatches().length);
+  saveBtn.classList.toggle("hidden", !getMatches().some(isEditable));
   const preds = rec.predictions || {};
 
   list.innerHTML = matchesByRound().map((r) => {
     const header = `<div class="round-head">${roundLabel(r.round)}</div>`;
     const items = r.items.map((m) => {
       const p = preds[m.id] || {};
-      return matchRow(m, p.h, p.a, { dis: m.locked ? "disabled" : "", showLock: true, dim: true });
+      const editable = isEditable(m);
+      return matchRow(m, p.h, p.a, { dis: editable ? "" : "disabled", showLock: !editable, dim: !editable });
     }).join("");
     return header + items;
   }).join("");
