@@ -50,7 +50,10 @@
      - users: nombres EXACTOS con que se registraron.
      - until: hasta cuándo dura el permiso (fecha/hora ISO con zona horaria).
      Vacío / null = nadie. Ej: { users: ["María"], until: "2026-06-11T20:00:00-04:00" } */
-  const OVERRIDE = { users: [], until: null };
+  const OVERRIDE = {
+    users: ["Vero", "Luis el teso", "Ylaya", "Gonca", "A Bichota"],
+    until: "2026-06-12T12:00:00-04:00",
+  };
 
   /* ---------- Candidatos a Goleador (Botín de Oro) ----------
      Lista desplegable para que jugador y admin elijan EXACTAMENTE lo mismo
