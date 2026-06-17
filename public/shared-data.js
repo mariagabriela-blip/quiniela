@@ -51,8 +51,8 @@
      - until: hasta cuándo dura el permiso (fecha/hora ISO con zona horaria).
      Vacío / null = nadie. Ej: { users: ["María"], until: "2026-06-11T20:00:00-04:00" } */
   const OVERRIDE = {
-    users: ["Vero", "Luis el teso", "Ylaya", "Gonca", "A Bichota +30"],
-    until: "2026-06-12T12:00:00-04:00",
+    users: ["Ylaya", "Gonca", "Luis el teso"],
+    until: "2026-06-17T09:36:00-04:00",
   };
 
   /* ---------- Candidatos a Goleador (Botín de Oro) ----------

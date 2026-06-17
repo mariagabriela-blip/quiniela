@@ -525,19 +525,26 @@ function renderExtras() {
   const gLocked = !!lastState.globalLocked;
   const dis = gLocked ? "disabled" : "";
 
-  // Comodín: opciones de partidos. Editable si está abierto, o (con permiso
-  // especial) si el partido aún no se ha jugado. Tu comodín actual siempre se muestra.
+  // Comodín: con permiso especial, solo si NO tienes comodín y eliges un partido
+  // donde NINGÚN equipo ha debutado (ningún partido suyo tiene resultado).
   const ov = myOverride();
+  const myJokerEmpty = !rec.joker;
+  const debuted = new Set();
+  for (const m of getMatches()) if (lastState.results[m.id]) { debuted.add(m.home); debuted.add(m.away); }
+  const canPickJoker = (m) => {
+    if (!m.locked) return true;
+    return !!ov && myJokerEmpty && !debuted.has(m.home) && !debuted.has(m.away);
+  };
   const jokerOpts = '<option value="">— sin comodín —</option>' +
     matchesByRound().map((r) => r.items.map((m) => {
       const lbl = `${roundLabel(r.round).replace(/^[^ ]+ /, "")}: ${teamFlag(m.home)} ${TEAMS[m.home]?.name || m.home} vs ${teamFlag(m.away)} ${TEAMS[m.away]?.name || m.away}`;
-      const canPick = isEditable(m) || m.id === rec.joker;
+      const canPick = canPickJoker(m) || m.id === rec.joker;
       const d = canPick ? "" : "disabled";
-      const ic = !isEditable(m) ? "🔒 " : "";
+      const ic = !canPickJoker(m) ? "🔒 " : "";
       return `<option value="${m.id}" ${m.id === rec.joker ? "selected" : ""} ${d}>${ic}${lbl}</option>`;
     }).join("")).join("");
-  const ovNote = ov
-    ? `<p class="deadline open" style="margin:0 0 4px">🔓 Acceso especial hasta las <b>${new Date(ov).toLocaleString("es-VE", { hour: "2-digit", minute: "2-digit" })}</b>: puedes elegir comodín en partidos que aún no se juegan.</p>`
+  const ovNote = (ov && myJokerEmpty)
+    ? `<p class="deadline open" style="margin:0 0 4px">🔓 Acceso especial hasta las <b>${new Date(ov).toLocaleString("es-VE", { hour: "2-digit", minute: "2-digit" })}</b>: elige tu comodín en un partido donde <b>ningún equipo ha debutado</b>.</p>`
     : "";
 
   body.innerHTML = `

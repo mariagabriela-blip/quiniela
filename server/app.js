@@ -251,12 +251,19 @@ app.post("/api/joker", async (req, res, next) => {
     if (player.pin_hash !== hashPin(pin)) return res.status(403).json({ error: "PIN incorrecto 😏" });
 
     if (matchId) {
-      const m = (await store.allMatches()).find((x) => x.id === matchId);
+      const all = await store.allMatches();
+      const m = all.find((x) => x.id === matchId);
       if (!m) return res.status(404).json({ error: "Ese partido no existe" });
-      const played = new Set((await store.allResults()).map((r) => r.match_id));
-      // Editable si está abierto, o si tiene permiso especial y el partido aún no se jugó.
-      const ok = !matchLocked(m) || (overrideActive(name) && !played.has(matchId));
-      if (!ok) return res.status(403).json({ error: "Ese partido ya cerró: elige uno que aún esté abierto." });
+      let ok = !matchLocked(m); // normalmente: el partido está abierto
+      // Permiso especial: si el jugador NO tiene comodín y NINGÚN equipo del
+      // partido ha debutado (ningún partido suyo tiene resultado cargado).
+      if (!ok && overrideActive(name) && !player.joker) {
+        const played = new Set((await store.allResults()).map((r) => r.match_id));
+        const debuted = new Set();
+        for (const mm of all) if (played.has(mm.id)) { debuted.add(mm.home); debuted.add(mm.away); }
+        if (!debuted.has(m.home) && !debuted.has(m.away)) ok = true;
+      }
+      if (!ok) return res.status(403).json({ error: "Ese partido ya cerró o algún equipo ya debutó: elige uno disponible." });
       await store.setJoker(name, matchId);
     } else {
       await store.setJoker(name, null); // quitar comodín
