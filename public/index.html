@@ -33,6 +33,7 @@
     <button class="tab" data-tab="tabla">🏅 Tabla</button>
     <button class="tab" data-tab="bymatch">📅 Por Partido</button>
     <button class="tab" data-tab="comodines">✨ Comodines</button>
+    <button class="tab" data-tab="groups">📊 Grupos/Llaves</button>
     <button class="tab" data-tab="admin">🔐 Admin</button>
   </nav>
 
@@ -142,6 +143,13 @@
       <h2>✨ Comodines</h2>
       <p class="muted">Quién puso su comodín (puntos dobles) en cada partido, empezando por la ronda actual.</p>
       <div id="comodinesBody"></div>
+    </section>
+
+    <!-- ============ GRUPOS Y LLAVES ============ -->
+    <section class="panel" id="groups">
+      <h2>📊 Posiciones y Llaves</h2>
+      <p class="muted">Tabla real de cada grupo y el cuadro de eliminatorias (se llena con los resultados que carga el admin).</p>
+      <div id="groupsBody"></div>
     </section>
 
     <!-- ============ ADMIN ============ -->

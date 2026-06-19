@@ -96,7 +96,90 @@ function renderActivePanel() {
   if (activeTab === "tabla") renderLeaderboard();
   if (activeTab === "bymatch") renderByMatch();
   if (activeTab === "comodines") renderComodines();
+  if (activeTab === "groups") renderGroups();
   if (activeTab === "admin") renderAdmin();
+}
+
+/* ============================================================
+   GRUPOS (tabla de posiciones) + LLAVES (bracket)
+   ============================================================ */
+function groupStandings() {
+  const byGroup = {};
+  for (const m of getMatches()) {
+    if (m.round !== "Grupos") continue;
+    const g = m.group;
+    (byGroup[g] ||= {});
+    for (const t of [m.home, m.away]) {
+      byGroup[g][t] ||= { team: t, PJ: 0, G: 0, E: 0, P: 0, GF: 0, GC: 0, Pts: 0 };
+    }
+    const rr = lastState.results[m.id];
+    if (!rr) continue;
+    const h = byGroup[g][m.home], a = byGroup[g][m.away];
+    h.PJ++; a.PJ++; h.GF += rr.h; h.GC += rr.a; a.GF += rr.a; a.GC += rr.h;
+    if (rr.h > rr.a) { h.G++; a.P++; h.Pts += 3; }
+    else if (rr.h < rr.a) { a.G++; h.P++; a.Pts += 3; }
+    else { h.E++; a.E++; h.Pts++; a.Pts++; }
+  }
+  const out = {};
+  for (const g of Object.keys(byGroup).sort()) {
+    out[g] = Object.values(byGroup[g])
+      .map((t) => ({ ...t, DG: t.GF - t.GC }))
+      .sort((x, y) => y.Pts - x.Pts || y.DG - x.DG || y.GF - x.GF ||
+        (TEAMS[x.team]?.name || x.team).localeCompare(TEAMS[y.team]?.name || y.team));
+  }
+  return out;
+}
+function renderGroups() {
+  const box = $("#groupsBody");
+  const standings = groupStandings();
+  const groups = Object.keys(standings);
+
+  // --- Tablas de cada grupo ---
+  let tablesHTML = groups.length
+    ? `<div class="gtables">` + groups.map((g) => {
+        const rows = standings[g].map((t, i) => `
+          <tr class="${i < 2 ? "qual" : ""}">
+            <td>${i + 1}</td>
+            <td class="gt-team">${teamFlag(t.team)} ${TEAMS[t.team]?.name || t.team}</td>
+            <td>${t.PJ}</td>
+            <td>${t.G}-${t.E}-${t.P}</td>
+            <td>${t.DG > 0 ? "+" : ""}${t.DG}</td>
+            <td><b>${t.Pts}</b></td>
+          </tr>`).join("");
+        return `<div class="gcard">
+          <div class="round-head">Grupo ${g}</div>
+          <table class="gtable">
+            <thead><tr><th>#</th><th>Equipo</th><th>PJ</th><th>G-E-P</th><th>DG</th><th>Pts</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+      }).join("") + `</div>`
+    : '<p class="empty">Aún no hay grupos.</p>';
+
+  // --- Bracket de eliminatorias ---
+  const koRounds = ["Dieciseisavos", "Octavos", "Cuartos", "Semifinal", "Final", "3er puesto"];
+  const cols = koRounds.map((r) => {
+    const items = getMatches().filter((m) => m.round === r).sort((a, b) => (a.slot || 0) - (b.slot || 0));
+    if (!items.length) return "";
+    const cards = items.map((m) => {
+      const rr = lastState.results[m.id];
+      const teamLine = (code, sc, isWin) => `
+        <div class="bk-team ${isWin ? "bk-win" : ""}">
+          <span>${teamFlag(code)} ${TEAMS[code]?.name || code}</span>
+          <span class="bk-sc">${sc ?? ""}</span>
+        </div>`;
+      return `<div class="bk-match">
+        ${teamLine(m.home, rr ? rr.h : "", m.winner === m.home)}
+        ${teamLine(m.away, rr ? rr.a : "", m.winner === m.away)}
+      </div>`;
+    }).join("");
+    return `<div class="bk-col"><div class="bk-head">${roundLabel(r)}</div>${cards}</div>`;
+  }).join("");
+  const bracketHTML = cols
+    ? `<h3 class="bk-title">🗺️ Llaves</h3><div class="bracket">${cols}</div>`
+    : `<h3 class="bk-title">🗺️ Llaves</h3><p class="muted small">El cuadro de eliminatorias se arma cuando el admin cargue los Dieciseisavos.</p>`;
+
+  box.innerHTML = tablesHTML + bracketHTML;
 }
 
 /* ============================================================
@@ -937,7 +1020,7 @@ tick();
   if (stateError) toast("⚠️ " + stateError);
   const rec = myRecord();
   if (rec && rec.fav) $("#favTeam").value = rec.fav;
-  setInterval(() => { if (["tabla", "bymatch", "comodines"].includes(activeTab)) refreshState(); }, 8000);
+  setInterval(() => { if (["tabla", "bymatch", "comodines", "groups"].includes(activeTab)) refreshState(); }, 8000);
   // Cuenta regresiva en vivo (cada segundo) mientras ves tu quiniela
   setInterval(() => { if (activeTab === "quiniela") renderDeadlineBanner(); }, 1000);
 })();
