@@ -723,6 +723,14 @@ function lbDetailHTML(p) {
   }).join("");
 }
 
+function tablaJoke() {
+  const j = (typeof TABLA_JOKE !== "undefined") ? TABLA_JOKE : null;
+  if (!j || !j.users || !j.users.length) return null;
+  const until = j.until ? Date.parse(j.until) : NaN;
+  if (!Number.isFinite(until) || Date.now() >= until) return null;
+  return { names: new Set(j.users.map((s) => String(s).trim().toLowerCase())), label: j.label || "Fuera por voto popular" };
+}
+
 function renderLeaderboard() {
   renderPozo();
   const lb = $("#leaderboard");
@@ -734,15 +742,28 @@ function renderLeaderboard() {
   const medals = ["🥇", "🥈", "🥉"];
   const cls = ["gold", "silver", "bronze"];
 
-  lb.innerHTML = players.map((p, i) => {
+  // Broma temporal: manda a ciertos jugadores al fondo (sin tocar sus puntos).
+  const joke = tablaJoke();
+  let list = players;
+  if (joke) {
+    const isJ = (p) => joke.names.has(p.name.trim().toLowerCase());
+    list = players.filter((p) => !isJ(p)).concat(players.filter(isJ));
+  }
+
+  let rank = 0;
+  lb.innerHTML = list.map((p, i) => {
+    const isJoke = !!joke && joke.names.has(p.name.trim().toLowerCase());
     const fav = p.fav ? teamFlag(p.fav) : "🏳️";
     const paid = p.paid ? "" : ' <small>(sin pago 💸)</small>';
     const mine = me && p.name === me.name ? " is-me" : "";
     const open = lbOpen.has(p.name);
+    let posCell = "🚫", rowCls = "";
+    if (!isJoke) { posCell = medals[rank] || (rank + 1); rowCls = cls[rank] || ""; rank++; }
+    const tag = isJoke ? ` <span class="joke-tag">${joke.label}</span>` : "";
     return `<div class="lb-wrap">
-      <div class="lb-row ${cls[i] || ""}${mine}">
-        <div class="pos">${medals[i] || (i + 1)}</div>
-        <div class="who">${fav} ${p.name}${paid} <span class="tap">${open ? "🔼 ocultar" : "👁️ ver quiniela"}</span></div>
+      <div class="lb-row ${rowCls}${mine}${isJoke ? " lb-joke" : ""}">
+        <div class="pos">${posCell}</div>
+        <div class="who">${fav} ${p.name}${paid}${tag} <span class="tap">${open ? "🔼 ocultar" : "👁️ ver quiniela"}</span></div>
         <div class="pts-badge">${p.points} pts</div>
       </div>
       <div class="lb-detail ${open ? "" : "hidden"}" id="d-${i}">${open ? lbDetailHTML(p) : ""}</div>
@@ -751,7 +772,7 @@ function renderLeaderboard() {
 
   $$(".lb-row").forEach((row, i) => {
     row.addEventListener("click", () => {
-      const p = players[i];
+      const p = list[i];
       const det = $("#d-" + i);
       const tap = row.querySelector(".tap");
       if (lbOpen.has(p.name)) {

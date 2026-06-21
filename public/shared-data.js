@@ -22,6 +22,7 @@
     root.BONUS = data.BONUS;
     root.GOLEADORES = data.GOLEADORES;
     root.OVERRIDE = data.OVERRIDE;
+    root.TABLA_JOKE = data.TABLA_JOKE;
   }
 })(typeof self !== "undefined" ? self : this, function () {
 
@@ -53,6 +54,15 @@
   const OVERRIDE = {
     users: ["Ylaya", "Gonca", "Luis el teso"],
     until: "2026-06-17T09:36:00-04:00",
+  };
+
+  /* ---------- Broma temporal en la TABLA ----------
+     Manda a ciertos jugadores al fondo con un cartel, SIN tocar sus puntos.
+     Es solo visual y se quita solo al pasar 'until'. Vacío = nada. */
+  const TABLA_JOKE = {
+    users: ["Lilibeth", "Sam"],
+    label: "🚫 Fuera de la quiniela por voto popular 🗳️😂",
+    until: "2026-06-21T19:11:00-04:00",
   };
 
   /* ---------- Candidatos a Goleador (Botín de Oro) ----------
@@ -209,5 +219,5 @@
     return 0;
   }
 
-  return { TEAMS, MATCHES, JOKES, scoreMatch, DEADLINE, CUOTA, MONEDA, BONUS, GOLEADORES, OVERRIDE };
+  return { TEAMS, MATCHES, JOKES, scoreMatch, DEADLINE, CUOTA, MONEDA, BONUS, GOLEADORES, OVERRIDE, TABLA_JOKE };
 });
