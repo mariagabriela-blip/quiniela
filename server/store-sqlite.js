@@ -76,7 +76,16 @@ module.exports = {
   ready: Promise.resolve(),
 
   async allPlayers() {
-    return db.prepare("SELECT * FROM players ORDER BY created_at ASC").all();
+    // NO traer el comprobante (imagen pesada): solo si pagó. Evita gastar
+    // transferencia de datos en cada actualización de la tabla.
+    return db.prepare(`
+      SELECT name, fav, pin_hash, created_at, champ, runnerup, scorer, surprise, joker,
+             (receipt IS NOT NULL) AS paid
+      FROM players ORDER BY created_at ASC
+    `).all();
+  },
+  async allReceipts() {
+    return db.prepare("SELECT name, receipt FROM players WHERE receipt IS NOT NULL").all();
   },
   async getPlayer(name) {
     return db.prepare("SELECT * FROM players WHERE name = ?").get(name);

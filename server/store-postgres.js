@@ -106,7 +106,17 @@ module.exports = {
   get ready() { return ensureReady(); },
 
   async allPlayers() {
-    const { rows } = await pool.query("SELECT * FROM players ORDER BY created_at ASC");
+    // NO traer el comprobante (imagen pesada): solo si pagó. Evita gastar
+    // transferencia de datos en cada actualización de la tabla.
+    const { rows } = await pool.query(`
+      SELECT name, fav, pin_hash, created_at, champ, runnerup, scorer, surprise, joker,
+             (receipt IS NOT NULL) AS paid
+      FROM players ORDER BY created_at ASC
+    `);
+    return rows;
+  },
+  async allReceipts() {
+    const { rows } = await pool.query("SELECT name, receipt FROM players WHERE receipt IS NOT NULL");
     return rows;
   },
   async getPlayer(name) {

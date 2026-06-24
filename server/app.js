@@ -124,7 +124,7 @@ app.get("/api/state", async (_req, res, next) => {
       const jokerPts = pl.joker && perMatch[pl.joker] ? perMatch[pl.joker] : 0; // doble = +1 vez
       const bonusPts = bonusPoints(pl, ans);
       return {
-        name: pl.name, fav: pl.fav, paid: !!pl.receipt,
+        name: pl.name, fav: pl.fav, paid: !!pl.paid,
         predictions, perMatch,
         bonus: { champ: pl.champ || null, runnerup: pl.runnerup || null, scorer: pl.scorer || null, surprise: pl.surprise || null },
         joker: pl.joker || null,
@@ -280,9 +280,10 @@ app.post("/api/admin/login", (req, res) => {
 app.get("/api/admin/players", requireAdmin, async (_req, res, next) => {
   try {
     const players = await store.allPlayers();
+    const receipts = Object.fromEntries((await store.allReceipts()).map((r) => [r.name, r.receipt]));
     res.json({
       players: players.map((p) => ({
-        name: p.name, fav: p.fav, paid: !!p.receipt, receipt: p.receipt || null,
+        name: p.name, fav: p.fav, paid: !!p.paid, receipt: receipts[p.name] || null,
       })),
     });
   } catch (e) { next(e); }

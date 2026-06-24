@@ -1041,7 +1041,10 @@ tick();
   if (stateError) toast("⚠️ " + stateError);
   const rec = myRecord();
   if (rec && rec.fav) $("#favTeam").value = rec.fav;
-  setInterval(() => { if (["tabla", "bymatch", "comodines", "groups"].includes(activeTab)) refreshState(); }, 8000);
+  // Refresco en vivo: cada 20s y solo si la pestaña está visible (ahorra datos).
+  setInterval(() => {
+    if (!document.hidden && ["tabla", "bymatch", "comodines", "groups"].includes(activeTab)) refreshState();
+  }, 20000);
   // Cuenta regresiva en vivo (cada segundo) mientras ves tu quiniela
   setInterval(() => { if (activeTab === "quiniela") renderDeadlineBanner(); }, 1000);
 })();

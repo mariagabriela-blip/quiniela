@@ -26,7 +26,7 @@ if (usePostgres) {
   module.exports = {
     kind: "missing",
     ready,
-    allPlayers: fail, getPlayer: fail, savePlayer: fail,
+    allPlayers: fail, allReceipts: fail, getPlayer: fail, savePlayer: fail,
     allMatches: fail, insertMatch: fail, deleteMatch: fail,
     updateMatchTeams: fail, setMatchWinner: fail, setMatchDeadline: fail,
     allPredictions: fail, upsertPrediction: fail, deletePrediction: fail,
