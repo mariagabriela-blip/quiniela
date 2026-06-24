@@ -82,6 +82,68 @@ app.get("/api/health", async (_req, res) => {
   catch (e) { res.status(503).json({ ok: false, db: store.kind, error: e.message }); }
 });
 
+// Migración de un solo uso: copia la base ORIGEN (DATABASE_URL actual) a una
+// base NUEVA (target). NO depende de store (que puede estar bloqueado).
+app.post("/api/admin/migrate", async (req, res) => {
+  if ((req.get("x-admin-pin") || req.body.pin) !== ADMIN_PIN)
+    return res.status(401).json({ error: "PIN de admin incorrecto" });
+  const { Pool } = require("pg");
+  const clean = (s) => String(s || "").replace(/([?&])channel_binding=require/g, "");
+  const source = clean(process.env.DATABASE_URL || process.env.POSTGRES_URL);
+  const target = clean(req.body.target);
+  if (!source) return res.status(400).json({ error: "No hay base ORIGEN (DATABASE_URL) en este despliegue" });
+  if (!/^postgres/.test(target)) return res.status(400).json({ error: "Falta la conexión NUEVA (target)" });
+  const ssl = { rejectUnauthorized: false };
+  const src = new Pool({ connectionString: source, ssl, max: 2 });
+  const dst = new Pool({ connectionString: target, ssl, max: 2 });
+  try {
+    await dst.query(`CREATE TABLE IF NOT EXISTS players (name TEXT PRIMARY KEY, fav TEXT, receipt TEXT, pin_hash TEXT, created_at BIGINT, champ TEXT, runnerup TEXT, scorer TEXT, surprise TEXT, joker TEXT)`);
+    await dst.query(`CREATE TABLE IF NOT EXISTS matches (id TEXT PRIMARY KEY, round TEXT, grp TEXT, home TEXT, away TEXT, deadline TEXT, ord INTEGER, slot INTEGER, winner TEXT)`);
+    await dst.query(`CREATE TABLE IF NOT EXISTS predictions (player_name TEXT, match_id TEXT, h INTEGER, a INTEGER, PRIMARY KEY (player_name, match_id))`);
+    await dst.query(`CREATE TABLE IF NOT EXISTS results (match_id TEXT PRIMARY KEY, h INTEGER, a INTEGER)`);
+    await dst.query(`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`);
+
+    const copied = {};
+    const players = (await src.query("SELECT * FROM players")).rows;
+    for (const p of players) await dst.query(
+      `INSERT INTO players (name,fav,receipt,pin_hash,created_at,champ,runnerup,scorer,surprise,joker) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       ON CONFLICT (name) DO UPDATE SET fav=$2,receipt=$3,pin_hash=$4,created_at=$5,champ=$6,runnerup=$7,scorer=$8,surprise=$9,joker=$10`,
+      [p.name, p.fav, p.receipt, p.pin_hash, p.created_at, p.champ, p.runnerup, p.scorer, p.surprise, p.joker]);
+    copied.players = players.length;
+
+    const matches = (await src.query("SELECT * FROM matches")).rows;
+    for (const m of matches) await dst.query(
+      `INSERT INTO matches (id,round,grp,home,away,deadline,ord,slot,winner) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       ON CONFLICT (id) DO UPDATE SET round=$2,grp=$3,home=$4,away=$5,deadline=$6,ord=$7,slot=$8,winner=$9`,
+      [m.id, m.round, m.grp, m.home, m.away, m.deadline, m.ord, m.slot, m.winner]);
+    copied.matches = matches.length;
+
+    const preds = (await src.query("SELECT * FROM predictions")).rows;
+    for (const pr of preds) await dst.query(
+      `INSERT INTO predictions (player_name,match_id,h,a) VALUES ($1,$2,$3,$4) ON CONFLICT (player_name,match_id) DO UPDATE SET h=$3,a=$4`,
+      [pr.player_name, pr.match_id, pr.h, pr.a]);
+    copied.predictions = preds.length;
+
+    const results = (await src.query("SELECT * FROM results")).rows;
+    for (const r of results) await dst.query(
+      `INSERT INTO results (match_id,h,a) VALUES ($1,$2,$3) ON CONFLICT (match_id) DO UPDATE SET h=$2,a=$3`,
+      [r.match_id, r.h, r.a]);
+    copied.results = results.length;
+
+    let settings = [];
+    try { settings = (await src.query("SELECT * FROM settings")).rows; } catch {}
+    for (const s of settings) await dst.query(
+      `INSERT INTO settings (key,value) VALUES ($1,$2) ON CONFLICT (key) DO UPDATE SET value=$2`, [s.key, s.value]);
+    copied.settings = settings.length;
+
+    res.json({ ok: true, copied });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  } finally {
+    src.end().catch(() => {}); dst.end().catch(() => {});
+  }
+});
+
 // Espera a que las tablas existan antes de atender la API.
 app.use("/api", async (_req, res, next) => {
   try { await store.ready; next(); }

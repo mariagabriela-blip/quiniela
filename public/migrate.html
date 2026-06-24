@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Migrar datos — Quiniela</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 620px; margin: 30px auto; padding: 0 16px; color: #14210f; }
+    h1 { font-size: 1.4rem; }
+    label { display: block; font-weight: 700; margin: 16px 0 6px; }
+    input, textarea { width: 100%; padding: 11px; border: 2px solid #d9e2d4; border-radius: 10px; font-size: 1rem; font-family: inherit; }
+    textarea { min-height: 80px; }
+    button { margin-top: 18px; width: 100%; padding: 14px; border: none; border-radius: 12px; background: #0a7d3c; color: #fff; font-weight: 800; font-size: 1.05rem; cursor: pointer; }
+    button:disabled { opacity: .6; }
+    #out { margin-top: 18px; padding: 14px; border-radius: 10px; white-space: pre-wrap; font-weight: 600; display: none; }
+    .ok { background: #e6f4ea; color: #065a2a; }
+    .err { background: #ffe0e0; color: #c0223a; }
+    .muted { color: #667; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <h1>🔄 Migrar datos a la base nueva</h1>
+  <p class="muted">Copia todos los datos de la base actual a la base NUEVA. Puedes ejecutarlo varias veces sin problema (no duplica).</p>
+
+  <label>PIN de Admin</label>
+  <input type="password" id="pin" placeholder="Tu PIN de admin" />
+
+  <label>Conexión de la base NUEVA (postgresql://...)</label>
+  <textarea id="target" placeholder="postgresql://...neon.tech/neondb?sslmode=require"></textarea>
+
+  <button id="go">🚀 Copiar datos ahora</button>
+  <div id="out"></div>
+
+  <script>
+    const out = document.getElementById("out");
+    document.getElementById("go").addEventListener("click", async () => {
+      const pin = document.getElementById("pin").value.trim();
+      const target = document.getElementById("target").value.trim();
+      const btn = document.getElementById("go");
+      out.style.display = "block"; out.className = ""; out.textContent = "Copiando… (puede tardar unos segundos)";
+      btn.disabled = true;
+      try {
+        const r = await fetch("/api/admin/migrate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ pin, target }),
+        });
+        const data = await r.json();
+        if (!r.ok) throw new Error(data.error || "Error");
+        out.className = "ok";
+        out.textContent = "✅ Listo. Copiado:\n" + JSON.stringify(data.copied, null, 2) +
+          "\n\nAhora cambia DATABASE_URL en Vercel por la conexión NUEVA y haz Redeploy.";
+      } catch (e) {
+        out.className = "err";
+        out.textContent = "❌ " + e.message;
+      } finally { btn.disabled = false; }
+    });
+  </script>
+</body>
+</html>
